@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import LoginPage from './pages/LoginPages';
+import DashboardPage from './pages/DashboardPage';
+import Sidebar from './components/Layout/Sidebar';
+import Header from './components/Layout/Header';
 
 const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
