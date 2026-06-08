@@ -20,6 +20,7 @@ const NavLink = ({ href, icon, label, active, desktop, onClick }) => (
 const Sidebar = ({ isOpen, onClose, currentPage, onPageChange, onLogout }) => {
   const navItems = [
     { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { id: 'sensors', icon: 'sensors', label: 'Sensor Monitoring' },
     { id: 'notifications', icon: 'notifications', label: 'Notifications' },
     { id: 'settings', icon: 'settings', label: 'Settings' },
   ];
