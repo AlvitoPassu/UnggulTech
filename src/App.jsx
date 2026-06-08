@@ -4,6 +4,7 @@ import DashboardPage from './pages/DashboardPage';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import SettingsPage from './pages/SettingsPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
