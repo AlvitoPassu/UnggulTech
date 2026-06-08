@@ -22,6 +22,7 @@ const Sidebar = ({ isOpen, onClose, currentPage, onPageChange, onLogout }) => {
     { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
     { id: 'sensors', icon: 'sensors', label: 'Sensor Monitoring' },
     { id: 'notifications', icon: 'notifications', label: 'Notifications' },
+    { id: 'reports', icon: 'assessment', label: 'Reports' },
     { id: 'settings', icon: 'settings', label: 'Settings' },
   ];
 

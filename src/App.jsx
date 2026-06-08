@@ -6,6 +6,7 @@ import Header from './components/Layout/Header';
 import SettingsPage from './pages/SettingsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SensorMonitoringPage from './pages/SensorMonitoringPage';
+import ReportsPage from './pages/ReportsPage';
 
 const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
