@@ -7,15 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const data = [
-  { time: "06:00", moisture: 40 },
-  { time: "09:00", moisture: 50 },
-  { time: "12:00", moisture: 45 },
-  { time: "15:00", moisture: 55 },
-  { time: "18:00", moisture: 60 },
-];
-
-const AnalyticsChart = () => {
+const AnalyticsChart = ({ data }) => {
   return (
     <div className="bg-white rounded-xl p-6 shadow-md h-[400px]">
       <h3 className="text-xl font-semibold mb-4">

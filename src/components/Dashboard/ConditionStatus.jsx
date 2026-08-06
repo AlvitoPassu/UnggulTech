@@ -1,4 +1,7 @@
-const ConditionStatus = () => {
+const ConditionStatus = ({ sensorData }) => {
+  const moisture = sensorData?.moisture || 0;
+  const temperature = sensorData?.temperature || 0;
+
   return (
     <div className="bg-white rounded-xl p-6 shadow-md">
       <h3 className="text-xl font-semibold mb-6">
@@ -8,13 +11,13 @@ const ConditionStatus = () => {
       <div className="mb-6">
         <div className="flex justify-between">
           <span>Moisture</span>
-          <span>65%</span>
+          <span>{moisture}%</span>
         </div>
 
         <div className="w-full bg-gray-200 h-3 rounded-full mt-2">
           <div
             className="bg-blue-500 h-3 rounded-full"
-            style={{ width: "65%" }}
+            style={{ width: `${moisture}%` }}
           />
         </div>
       </div>
@@ -22,13 +25,13 @@ const ConditionStatus = () => {
       <div>
         <div className="flex justify-between">
           <span>Temperature</span>
-          <span>24°C</span>
+          <span>{temperature}°C</span>
         </div>
 
         <div className="w-full bg-gray-200 h-3 rounded-full mt-2">
           <div
             className="bg-green-500 h-3 rounded-full"
-            style={{ width: "50%" }}
+            style={{ width: `${Math.min(temperature * 2, 100)}%` }}
           />
         </div>
       </div>

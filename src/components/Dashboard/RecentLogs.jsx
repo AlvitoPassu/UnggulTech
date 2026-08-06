@@ -1,6 +1,4 @@
-import { logs } from "../../data/dashboardData";
-
-const RecentLogs = () => {
+const RecentLogs = ({ logs }) => {
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden">
       <div className="p-4 border-b">
@@ -23,8 +21,8 @@ const RecentLogs = () => {
           {logs.map((log, index) => (
             <tr key={index}>
               <td className="p-3">{log.time}</td>
-              <td className="p-3">{log.moisture}</td>
-              <td className="p-3">{log.temp}</td>
+              <td className="p-3">{log.moisture}%</td>
+              <td className="p-3">{log.temperature}°C</td>
               <td className="p-3">{log.action}</td>
             </tr>
           ))}
