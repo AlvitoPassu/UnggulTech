@@ -1,3 +1,5 @@
+import axios from "axios";
+
 const sensors = [
   { id: "sensor-01", name: "Sensor 1", bedengan: 5 },
   { id: "sensor-02", name: "Sensor 2", bedengan: 12 },
@@ -54,4 +56,14 @@ export const getSensorData = async (sensorId) => {
       temperature: log.temperature + (index % 3),
     })),
   };
+};
+
+// Endpoint ini disiapkan untuk backend. Backend harus merespons file sebagai blob
+// dan sebaiknya mengirim header Content-Disposition berisi nama file.
+export const downloadSensorReport = async ({ sensorId, startDate, endDate, format, status }) => {
+  return axios.post(
+    "/api/reports/download",
+    { sensorId, startDate, endDate, format, status },
+    { responseType: "blob" },
+  );
 };

@@ -3,12 +3,14 @@ import SummaryCards from "../components/Dashboard/SummaryCards";
 import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
 import ConditionStatus from "../components/Dashboard/ConditionStatus";
 import RecentLogs from "../components/Dashboard/RecentLogs";
+import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
 import { getSensorData, getSensors } from "../api/sensorApi";
 
 const DashboardPage = () => {
   const [sensors, setSensors] = useState([]);
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
     getSensors().then((data) => {
@@ -52,6 +54,14 @@ const DashboardPage = () => {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => setIsDownloadModalOpen(true)}
+            className="bg-green-600 text-white font-medium rounded-lg px-4 py-2 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          >
+            Download Data
+          </button>
         </div>
       </div>
 
@@ -68,6 +78,14 @@ const DashboardPage = () => {
       <div className="mt-6">
         <RecentLogs logs={sensorData?.logs || []} />
       </div>
+
+      {isDownloadModalOpen && (
+        <DownloadDataModal
+          sensors={sensors}
+          selectedSensorId={selectedSensorId}
+          onClose={() => setIsDownloadModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
