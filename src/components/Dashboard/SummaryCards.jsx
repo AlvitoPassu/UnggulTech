@@ -16,8 +16,8 @@ const SummaryCards = ({ sensorData }) => {
           icon: summaryData[1].icon,
         },
         {
-          title: "Pump Status",
-          value: sensorData.pump,
+          title: "Sensor Status",
+          value: sensorData.sensorStatus,
           status: "Monitoring",
           icon: summaryData[2].icon,
         },

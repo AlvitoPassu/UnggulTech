@@ -1,6 +1,6 @@
 const ConditionStatus = ({ sensorData }) => {
   const moisture = sensorData?.moisture || 0;
-  const temperature = sensorData?.temperature || 0;
+  const temperature = sensorData?.temperature;
 
   return (
     <div className="bg-white rounded-xl p-6 shadow-md">
@@ -25,13 +25,13 @@ const ConditionStatus = ({ sensorData }) => {
       <div>
         <div className="flex justify-between">
           <span>Temperature</span>
-          <span>{temperature}°C</span>
+          <span>{temperature === null || temperature === undefined ? "-" : `${temperature}°C`}</span>
         </div>
 
         <div className="w-full bg-gray-200 h-3 rounded-full mt-2">
           <div
             className="bg-green-500 h-3 rounded-full"
-            style={{ width: `${Math.min(temperature * 2, 100)}%` }}
+            style={{ width: `${Math.min((temperature || 0) * 2, 100)}%` }}
           />
         </div>
       </div>

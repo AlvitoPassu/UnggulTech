@@ -22,7 +22,7 @@ const RecentLogs = ({ logs }) => {
             <tr key={index}>
               <td className="p-3">{log.time}</td>
               <td className="p-3">{log.moisture}%</td>
-              <td className="p-3">{log.temperature}°C</td>
+              <td className="p-3">{log.temperature === null ? "-" : `${log.temperature}°C`}</td>
               <td className="p-3">{log.action}</td>
             </tr>
           ))}
