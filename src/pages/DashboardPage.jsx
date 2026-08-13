@@ -50,7 +50,7 @@ const DashboardPage = () => {
           >
             {sensors.map((sensor) => (
               <option key={sensor.id} value={sensor.id}>
-                Bedengan {sensor.bedengan} - {sensor.name}
+                Bedengan {sensor.bedengan} - {sensor.sensor_name}
               </option>
             ))}
           </select>
