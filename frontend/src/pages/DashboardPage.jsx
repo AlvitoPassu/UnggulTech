@@ -4,12 +4,13 @@ import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
 import ConditionStatus from "../components/Dashboard/ConditionStatus";
 import RecentLogs from "../components/Dashboard/RecentLogs";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
-import { getSensorData, getSensors } from "../api/sensorApi";
+import { getRecentLogs, getSensorData, getSensors } from "../api/sensorApi";
 
 const DashboardPage = () => {
   const [sensors, setSensors] = useState([]);
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
+  const [recentLogs, setRecentLogs] = useState([]);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
@@ -21,11 +22,16 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!selectedSensorId) {
+      setRecentLogs([]);
       return;
     }
 
     getSensorData(selectedSensorId).then((data) => {
       setSensorData(data);
+    });
+
+    getRecentLogs(selectedSensorId).then((data) => {
+      setRecentLogs(data);
     });
   }, [selectedSensorId]);
 
@@ -76,7 +82,7 @@ const DashboardPage = () => {
       </div>
 
       <div className="mt-6">
-        <RecentLogs logs={sensorData?.logs || []} />
+        <RecentLogs logs={recentLogs} />
       </div>
 
       {isDownloadModalOpen && (

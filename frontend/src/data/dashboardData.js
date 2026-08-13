@@ -1,6 +1,5 @@
+import { FaCloudRain, FaTemperatureHigh } from "react-icons/fa";
 import { MdWaterDrop } from "react-icons/md";
-import { FaTemperatureHigh } from "react-icons/fa";
-import { WiRain } from "react-icons/wi";
 
 export const summaryData = [
   {
@@ -19,7 +18,7 @@ export const summaryData = [
     title: "Rain Prediction",
     value: "82%",
     status: "High Chance",
-    icon: WiRain,
+    icon: FaCloudRain,
   },
 ];
 
