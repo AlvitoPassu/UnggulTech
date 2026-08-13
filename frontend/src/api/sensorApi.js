@@ -33,9 +33,20 @@ const getMoistureStatus = (moisture) => {
 
 const formatTime = (date) => {
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Makassar",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(date));
+};
+
+export const getRecentLogs = async (sensorId) => {
+  try {
+    const response = await axios.get(`/api/sensors/${sensorId}/recent-logs`);
+    return response.data;
+  } catch (error) {
+    console.error("Error mengambil recent logs:", error);
+    return [];
+  }
 };
 
 // -----------------------------
@@ -78,14 +89,6 @@ export const getSensorData = async (sensorId) => {
     chart: data.map((reading) => ({
       time: formatTime(reading.created_at),
       moisture: Number(reading.moisture),
-    })),
-    logs: [...data].reverse().map((reading) => ({
-      time: formatTime(reading.created_at),
-      moisture: Number(reading.moisture),
-      temperature: reading.temperature === null
-        ? null
-        : Number(reading.temperature),
-      action: "Sensor Reading",
     })),
   };
 };
