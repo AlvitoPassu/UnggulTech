@@ -1,0 +1,31 @@
+import { ProjectGraph } from '../config/project-graph';
+import { Task } from '../config/task-graph';
+/**
+ * Resolves the FORCE_COLOR value for forked child processes.
+ *
+ * When the user sets FORCE_COLOR=0, bin/nx.ts deletes it from process.env
+ * (workaround for picocolors treating "0" as truthy) and saves the original
+ * value in NX_ORIGINAL_FORCE_COLOR. Without this check, the undefined
+ * FORCE_COLOR would default to 'true', re-enabling colors in all children.
+ */
+export declare function getForceColorForChild(): string;
+export declare function getEnvVariablesForBatchProcess(skipNxCache: boolean, captureStderr: boolean): NodeJS.ProcessEnv;
+export declare function getTaskSpecificEnv(task: Task, graph: ProjectGraph): NodeJS.ProcessEnv;
+export declare function getEnvVariablesForTask(task: Task, taskSpecificEnv: NodeJS.ProcessEnv, forceColor: string, skipNxCache: boolean, captureStderr: boolean, outputPath: string, streamOutput: boolean): NodeJS.ProcessEnv;
+/**
+ * This function loads one or more .env files and expands the variables in them.
+ * When multiple files are provided, all files are loaded first, then variable
+ * expansion happens once with the complete set of variables. This ensures
+ * cross-file variable references resolve correctly.
+ * @param filename the .env file(s) to load
+ * @param environmentVariables the object to load environment variables into
+ * @param override whether to override existing environment variables
+ */
+export declare function loadAndExpandDotEnvFile(filename: string | string[], environmentVariables: NodeJS.ProcessEnv, override?: boolean): import("dotenv-expand").DotenvExpandOutput;
+/**
+ * This function unloads a .env file and removes the variables in it from the environmentVariables.
+ * @param filename
+ * @param environmentVariables
+ */
+export declare function unloadDotEnvFile(filename: string, environmentVariables: NodeJS.ProcessEnv, override?: boolean): void;
+export declare function getEnvFilesForTask(task: Task, graph: ProjectGraph): string[];
