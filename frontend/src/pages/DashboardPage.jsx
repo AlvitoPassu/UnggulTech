@@ -22,7 +22,6 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!selectedSensorId) {
-      setRecentLogs([]);
       return;
     }
 
