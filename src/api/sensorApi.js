@@ -1,13 +1,38 @@
 import axios from "axios";
 import { supabase } from "../lib/supabase";
 
+export const getSensorDisplayName = (sensor = {}) => {
+  const bedenganValue = sensor.bedengan ?? sensor.bedengan_id ?? sensor.bed_id;
+  const sensorName = sensor.sensor_name?.trim() || sensor.name || `Sensor ${sensor.id ?? "baru"}`;
+
+  if (bedenganValue === null || bedenganValue === undefined || bedenganValue === "") {
+    return sensorName;
+  }
+
+  const bedenganLabel = `Bedengan ${bedenganValue}`;
+
+  return sensorName && sensorName !== bedenganLabel ? `${bedenganLabel} - ${sensorName}` : bedenganLabel;
+};
+
+export const sortSensorsByBedengan = (sensors = []) => {
+  return [...sensors].sort((a, b) => {
+    const aBedengan = Number.parseFloat(a.bedengan ?? a.bedengan_id ?? a.bed_id ?? Number.MAX_SAFE_INTEGER);
+    const bBedengan = Number.parseFloat(b.bedengan ?? b.bedengan_id ?? b.bed_id ?? Number.MAX_SAFE_INTEGER);
+
+    const aValue = Number.isFinite(aBedengan) ? aBedengan : Number.MAX_SAFE_INTEGER;
+    const bValue = Number.isFinite(bBedengan) ? bBedengan : Number.MAX_SAFE_INTEGER;
+
+    return aValue - bValue;
+  });
+};
+
 // -----------------------------
 // GET LIST SENSOR
 // -----------------------------
 export const getSensors = async () => {
   const { data, error } = await supabase
     .from("sensors")
-    .select("*")
+    .select("id, sensor_name, bedengan, location, status")
     .eq("status", "Active")
     .order("id", { ascending: true });
 
@@ -16,7 +41,7 @@ export const getSensors = async () => {
     return [];
   }
 
-  return data;
+  return sortSensorsByBedengan(data);
 };
 
 const getMoistureStatus = (moisture) => {

@@ -4,7 +4,7 @@ import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
 import ConditionStatus from "../components/Dashboard/ConditionStatus";
 import RecentLogs from "../components/Dashboard/RecentLogs";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
-import { getSensorData, getSensors } from "../api/sensorApi";
+import { getSensorData, getSensorDisplayName, getSensors } from "../api/sensorApi";
 
 const DashboardPage = () => {
   const [sensors, setSensors] = useState([]);
@@ -48,11 +48,15 @@ const DashboardPage = () => {
             onChange={(event) => setSelectedSensorId(event.target.value)}
             className="bg-white border border-gray-300 rounded-lg px-3 py-2"
           >
-            {sensors.map((sensor) => (
-              <option key={sensor.id} value={sensor.id}>
-                Bedengan {sensor.bedengan} - {sensor.sensor_name}
-              </option>
-            ))}
+            {sensors.length === 0 ? (
+              <option value="">Belum ada bedengan aktif</option>
+            ) : (
+              sensors.map((sensor) => (
+                <option key={sensor.id} value={sensor.id}>
+                  {getSensorDisplayName(sensor)}
+                </option>
+              ))
+            )}
           </select>
 
           <button
