@@ -1,0 +1,24 @@
+{
+  "name": "unggultech-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Soil Monitoring System - Monorepo",
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend",
+    "packages/soil-moisture"
+  ],
+  "scripts": {
+    "dev": "lerna run dev --parallel",
+    "dev:backend": "lerna run dev --scope=backend",
+    "dev:frontend": "lerna run dev --scope=frontend",
+    "dev:soil": "lerna run dev --scope=soil-moisture",
+    "build": "lerna run build --parallel",
+    "test": "lerna run test",
+    "lint": "lerna run lint",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "lerna": "^10.0.0"
+  }
+}

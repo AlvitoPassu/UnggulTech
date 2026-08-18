@@ -1,0 +1,15 @@
+{
+  "name": "soil-moisture",
+  "version": "1.0.0",
+  "description": "Soil moisture sensor firmware",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Soil moisture firmware - ready to upload with PlatformIO'",
+    "build": "echo 'Build soil moisture firmware'",
+    "upload": "platformio run -t upload"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {}
+}
