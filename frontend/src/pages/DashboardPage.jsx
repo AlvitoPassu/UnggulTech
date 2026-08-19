@@ -4,6 +4,7 @@ import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
 import ConditionStatus from "../components/Dashboard/ConditionStatus";
 import RecentLogs from "../components/Dashboard/RecentLogs";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
+import WeatherForecast from "../components/Weather/WeatherForecast";
 import { getRecentLogs, getSensorData, getSensors } from "../api/sensorApi";
 
 const DashboardPage = () => {
@@ -83,6 +84,10 @@ const DashboardPage = () => {
 
       <div className="mt-6">
         <RecentLogs logs={recentLogs} />
+      </div>
+
+      <div className="mt-6">
+        <WeatherForecast />
       </div>
 
       {isDownloadModalOpen && (
