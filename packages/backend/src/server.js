@@ -4,6 +4,7 @@ import express from "express";
 import { config } from "./config/supabase.js";
 import sensorRoutes from "./routes/sensorRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
+import weatherRoutes from "./routes/weatherRoutes.js";
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 // Route Mounts
 app.use("/api/sensors", sensorRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/weather", weatherRoutes);
 
 // Global Error Handler
 app.use((error, _req, res, _next) => {
