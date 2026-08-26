@@ -77,18 +77,12 @@ export async function insertSensorReadings(payload) {
 
     const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
     const status = sensorData.status ?? null;
-    const adc = sensorData.adc !== undefined ? Number(sensorData.adc) : null;
 
     const record = {
       sensor_id: sensorId,
       moisture: Number.isFinite(moisture) ? moisture : null,
       [config.statusColumn]: status,
     };
-
-    // Simpan adc jika ada kolomnya (opsional, tidak wajib ada di schema)
-    if (adc !== null) {
-      record.adc = adc;
-    }
 
     const { data, error } = await supabase
       .from(config.logsTable)
