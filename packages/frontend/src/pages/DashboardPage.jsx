@@ -4,6 +4,7 @@ import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
 import ConditionStatus from "../components/Dashboard/ConditionStatus";
 import RecentLogs from "../components/Dashboard/RecentLogs";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
+import WeatherCard from "../components/Dashboard/WeatherCard";
 import { getRecentLogs, getSensorData, getSensors, getSensorDisplayName } from "../api/sensorApi";
 
 const DashboardPage = () => {
@@ -81,7 +82,10 @@ const DashboardPage = () => {
           <AnalyticsChart data={sensorData?.chart || []} />
         </div>
 
-        <ConditionStatus sensorData={sensorData} />
+        <div className="flex flex-col gap-6">
+          <ConditionStatus sensorData={sensorData} />
+          <WeatherCard />
+        </div>
       </div>
 
       <div className="mt-6">
