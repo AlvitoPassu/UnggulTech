@@ -68,14 +68,31 @@ export async function insertSensorReadings(payload) {
 
   const insertPromises = sensorKeys.map(async (key) => {
     const sensorData = payload[key];
-    const sensorId = sensorIdMap[key];
 
-    if (!sensorId) {
-      console.warn(`Sensor ID untuk "${key}" tidak ditemukan di peta. Dilewati.`);
-      return { key, skipped: true, reason: "Sensor ID tidak ada di mapping" };
+    // Auto-extract sensor ID dari nama key (sensor1 → 1, sensor7 → 7)
+    const sensorId = sensorIdMap[key] ?? Number(key.replace(/\D/g, ""));
+
+    if (!sensorId || sensorId <= 0) {
+      console.warn(`Tidak bisa menentukan sensor ID untuk "${key}". Dilewati.`);
+      return { key, skipped: true, reason: "Sensor ID tidak valid" };
     }
 
     const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
+
+    // Auto-daftarkan sensor ke tabel sensors jika belum ada
+    // Jika sudah ada, tidak mengubah data yang sudah ada (ignoreDuplicates: true)
+    const sensorNum = sensorId;
+    await supabase
+      .from("sensors")
+      .upsert(
+        {
+          id: sensorId,
+          sensor_name: `Sensor ${sensorNum}`,
+          bedengan: sensorNum,
+          status: "Active",
+        },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
 
     const record = {
       sensor_id: sensorId,

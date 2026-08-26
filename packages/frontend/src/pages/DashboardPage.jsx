@@ -15,10 +15,21 @@ const DashboardPage = () => {
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
-    getSensors().then((data) => {
-      setSensors(data);
-      setSelectedSensorId(data[0]?.id || "");
-    });
+    const fetchSensors = () => {
+      getSensors().then((data) => {
+        setSensors(data);
+        // Set sensor pertama hanya saat inisialisasi awal
+        setSelectedSensorId((prev) => prev || data[0]?.id || "");
+      });
+    };
+
+    fetchSensors();
+
+    // Refresh daftar sensor setiap 60 detik
+    // agar sensor yang baru disambung otomatis muncul
+    const interval = setInterval(fetchSensors, 60_000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
