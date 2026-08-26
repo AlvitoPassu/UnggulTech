@@ -103,6 +103,8 @@ export const getSensorData = async (sensorId) => {
   }
 
   const latestReading = data[data.length - 1];
+  const lastSeenDate = new Date(latestReading.created_at);
+  const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
 
   return {
     moisture: Number(latestReading.moisture),
@@ -110,6 +112,8 @@ export const getSensorData = async (sensorId) => {
       ? null
       : Number(latestReading.temperature),
     sensorStatus: sensorResponse.data?.status || "Unknown",
+    isOnline: minutesSinceLastReading <= 5,
+    lastSeen: lastSeenDate,
     status: getMoistureStatus(Number(latestReading.moisture)),
     chart: data.map((reading) => ({
       time: formatTime(reading.created_at),
