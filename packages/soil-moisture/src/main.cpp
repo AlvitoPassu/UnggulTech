@@ -1,260 +1,1047 @@
-// sensor 1
-
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
 #include <WebServer.h>
 
-// Isi dengan nama WiFi rumah/kantor Anda.
-const char* ssid = "unklab";
-const char* password = "11111111";
+// =====================================================
+// WIFI
+// =====================================================
 
-// Ganti setelah backend dideploy ke Railway.
-// Contoh:
-// const char* serverUrl = "https://renderesp8266-production.up.railway.app/api/sensor";
-// const char* pingUrl = "https://renderesp8266-production.up.railway.app/ping";
-const char* serverUrl = "https://renderesp8266-production.up.railway.app/api/sensor";
-const char* pingUrl = "https://renderesp8266-production.up.railway.app/ping";
+const char* ssid = "sensorsoil";
+const char* password = "unklab123";
 
-// Pin ADC default ESP32 untuk membaca sensor kelembaban tanah.
-// Ubah ke pin ADC lain jika rangkaian Anda memakai pin berbeda.
-const int soilSensorPin = 34;
+// =====================================================
+// SERVER
+// =====================================================
 
-// Web server berjalan pada port 80.
+// Backend VPS Anda
+const char* serverUrl =
+    "https://unggulmonitoring.com/api/sensors";
+
+// Endpoint health check backend
+const char* pingUrl =
+    "https://unggulmonitoring.com/health";
+
+// =====================================================
+// CD74HC4067
+// JANGAN UBAH WIRING INI
+// =====================================================
+
+// SIG -> GPIO34
+// S0  -> GPIO14
+// S1  -> GPIO27
+// S2  -> GPIO26
+// S3  -> GPIO25
+
+constexpr int muxSigPin = 34;
+constexpr int muxS0Pin = 14;
+constexpr int muxS1Pin = 27;
+constexpr int muxS2Pin = 26;
+constexpr int muxS3Pin = 25;
+
+// =====================================================
+// CHANNEL SENSOR
+// =====================================================
+
+constexpr uint8_t sensor1Channel = 0; // CH0
+constexpr uint8_t sensor2Channel = 1; // CH1
+constexpr uint8_t sensor3Channel = 2; // CH2
+constexpr uint8_t sensor4Channel = 3; // CH3
+
+// =====================================================
+// INTERVAL
+// =====================================================
+
+constexpr unsigned long serialInterval = 2000;
+constexpr unsigned long serverInterval = 5000;
+
+// Jumlah pembacaan ADC setiap sensor
+constexpr uint8_t sensorSamplesPerRead = 8;
+
+// Waktu settling setelah pindah channel
+constexpr uint8_t muxSettleDelayMs = 5;
+
+// =====================================================
+// STRUKTUR SENSOR
+// =====================================================
+
+struct SensorReading {
+
+    uint8_t channel;
+
+    int adcValue;
+
+    int moisturePercent;
+
+    String soilStatus;
+};
+
+// =====================================================
+// KONFIGURASI KALIBRASI SENSOR
+// =====================================================
+
+struct SensorConfig {
+
+    uint8_t channel;
+
+    int adcDry;
+
+    int adcWet;
+
+    const char* label;
+};
+
+// =====================================================
+// SERVER DAN CLIENT
+// =====================================================
+
 WebServer server(80);
+
 WiFiClient wifiClient;
+
 WiFiClientSecure secureWifiClient;
 
-// Variabel global untuk menyimpan hasil pembacaan sensor terakhir.
-int adcValue = 0;
-int moisturePercent = 0;
-String soilStatus = "Tidak tersedia";
+// =====================================================
+// KALIBRASI SENSOR
+// =====================================================
 
-// Fungsi untuk menentukan status tanah berdasarkan persentase kelembaban.
+// Sensor 1
+// map(adcValue, 4095, 1722, 0, 100)
+
+constexpr SensorConfig sensor1Config = {
+
+    sensor1Channel,
+
+    4095,
+
+    1722,
+
+    "Sensor 1"
+};
+
+// Sensor 2
+// map(adcValue, 4095, 1378, 0, 100)
+
+constexpr SensorConfig sensor2Config = {
+
+    sensor2Channel,
+
+    4095,
+
+    1378,
+
+    "Sensor 2"
+};
+
+// Sensor 3
+// map(adcValue, 4095, 1371, 0, 100)
+
+constexpr SensorConfig sensor3Config = {
+
+    sensor3Channel,
+
+    4095,
+
+    1371,
+
+    "Sensor 3"
+};
+
+// Sensor 4
+// map(adcValue, 4095, 1704, 0, 100)
+
+constexpr SensorConfig sensor4Config = {
+
+    sensor4Channel,
+
+    4095,
+
+    1704,
+
+    "Sensor 4"
+};
+
+// =====================================================
+// DATA SENSOR
+// =====================================================
+
+SensorReading sensor1 = {
+    sensor1Config.channel,
+    0,
+    0,
+    "Tidak tersedia"
+};
+
+SensorReading sensor2 = {
+    sensor2Config.channel,
+    0,
+    0,
+    "Tidak tersedia"
+};
+
+SensorReading sensor3 = {
+    sensor3Config.channel,
+    0,
+    0,
+    "Tidak tersedia"
+};
+
+SensorReading sensor4 = {
+    sensor4Config.channel,
+    0,
+    0,
+    "Tidak tersedia"
+};
+
+// =====================================================
+// STATUS TANAH
+// =====================================================
+
 String getSoilStatus(int kelembaban) {
+
     if (kelembaban >= 0 && kelembaban <= 30) {
+
         return "Kering";
     }
 
     if (kelembaban <= 70) {
+
         return "Lembab";
     }
 
     return "Basah";
 }
 
-// Membaca sensor dari pin ADC ESP32, lalu mengubahnya ke persentase 0-100.
-void readSoilSensor() {
-    adcValue = analogRead(soilSensorPin);
+// =====================================================
+// PILIH CHANNEL MULTIPLEXER
+// =====================================================
 
-    // map() digunakan untuk mengubah nilai ADC menjadi persentase.
-    // Sesuaikan rentang ini jika hasil sensor Anda perlu dikalibrasi.
-    moisturePercent = map(adcValue, 4095, 1515, 0, 100);
+void selectMuxChannel(uint8_t channel) {
 
-    // constrain() memastikan hasil tetap berada pada rentang 0 sampai 100.
-    moisturePercent = constrain(moisturePercent, 0, 100);
+    digitalWrite(
+        muxS0Pin,
+        channel & 0x01
+    );
 
-    soilStatus = getSoilStatus(moisturePercent);
+    digitalWrite(
+        muxS1Pin,
+        (channel >> 1) & 0x01
+    );
+
+    digitalWrite(
+        muxS2Pin,
+        (channel >> 2) & 0x01
+    );
+
+    digitalWrite(
+        muxS3Pin,
+        (channel >> 3) & 0x01
+    );
 }
 
-// Menangani request ke endpoint /data dan mengirim respons JSON.
-void handleData() {
-    readSoilSensor();
+// =====================================================
+// BACA SATU SENSOR
+// =====================================================
+
+SensorReading readSoilSensor(
+    const SensorConfig& config
+) {
+
+    // Pilih channel
+    selectMuxChannel(config.channel);
+
+    // Tunggu multiplexer stabil
+    delay(muxSettleDelayMs);
+
+    // Buang pembacaan pertama
+    analogRead(muxSigPin);
+
+    delay(2);
+
+    // Ambil beberapa sampel
+    long totalAdc = 0;
+
+    for (
+        uint8_t i = 0;
+        i < sensorSamplesPerRead;
+        i++
+    ) {
+
+        totalAdc += analogRead(muxSigPin);
+
+        delay(2);
+    }
+
+    SensorReading reading;
+
+    reading.channel = config.channel;
+
+    // Rata-rata ADC
+    reading.adcValue =
+        totalAdc / sensorSamplesPerRead;
+
+    // Konversi ADC ke kelembaban
+    reading.moisturePercent = map(
+        reading.adcValue,
+        config.adcDry,
+        config.adcWet,
+        0,
+        100
+    );
+
+    // Pastikan 0-100%
+    reading.moisturePercent =
+        constrain(
+            reading.moisturePercent,
+            0,
+            100
+        );
+
+    // Status tanah
+    reading.soilStatus =
+        getSoilStatus(
+            reading.moisturePercent
+        );
+
+    return reading;
+}
+
+// =====================================================
+// BACA SEMUA SENSOR
+// =====================================================
+
+void updateAllSensors() {
+
+    sensor1 =
+        readSoilSensor(sensor1Config);
+
+    sensor2 =
+        readSoilSensor(sensor2Config);
+
+    sensor3 =
+        readSoilSensor(sensor3Config);
+
+    sensor4 =
+        readSoilSensor(sensor4Config);
+}
+
+// =====================================================
+// BUAT JSON
+// =====================================================
+
+String buildSensorJson() {
 
     String json = "{";
-    json += "\"kelembaban\":" + String(moisturePercent) + ",";
-    json += "\"status\":\"" + soilStatus + "\",";
-    json += "\"adc\":" + String(adcValue);
+
+    // -------------------------------------------------
+    // Sensor 1
+    // -------------------------------------------------
+
+    json += "\"sensor1\":{";
+
+    json += "\"channel\":";
+    json += String(sensor1.channel);
+
+    json += ",";
+
+    json += "\"kelembaban\":";
+    json += String(sensor1.moisturePercent);
+
+    json += ",";
+
+    json += "\"status\":\"";
+    json += sensor1.soilStatus;
+    json += "\"";
+
+    json += ",";
+
+    json += "\"adc\":";
+    json += String(sensor1.adcValue);
+
+    json += "},";
+
+    // -------------------------------------------------
+    // Sensor 2
+    // -------------------------------------------------
+
+    json += "\"sensor2\":{";
+
+    json += "\"channel\":";
+    json += String(sensor2.channel);
+
+    json += ",";
+
+    json += "\"kelembaban\":";
+    json += String(sensor2.moisturePercent);
+
+    json += ",";
+
+    json += "\"status\":\"";
+    json += sensor2.soilStatus;
+    json += "\"";
+
+    json += ",";
+
+    json += "\"adc\":";
+    json += String(sensor2.adcValue);
+
+    json += "},";
+
+    // -------------------------------------------------
+    // Sensor 3
+    // -------------------------------------------------
+
+    json += "\"sensor3\":{";
+
+    json += "\"channel\":";
+    json += String(sensor3.channel);
+
+    json += ",";
+
+    json += "\"kelembaban\":";
+    json += String(sensor3.moisturePercent);
+
+    json += ",";
+
+    json += "\"status\":\"";
+    json += sensor3.soilStatus;
+    json += "\"";
+
+    json += ",";
+
+    json += "\"adc\":";
+    json += String(sensor3.adcValue);
+
+    json += "},";
+
+    // -------------------------------------------------
+    // Sensor 4
+    // -------------------------------------------------
+
+    json += "\"sensor4\":{";
+
+    json += "\"channel\":";
+    json += String(sensor4.channel);
+
+    json += ",";
+
+    json += "\"kelembaban\":";
+    json += String(sensor4.moisturePercent);
+
+    json += ",";
+
+    json += "\"status\":\"";
+    json += sensor4.soilStatus;
+    json += "\"";
+
+    json += ",";
+
+    json += "\"adc\":";
+    json += String(sensor4.adcValue);
+
     json += "}";
 
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "application/json", json);
+    json += "}";
+
+    return json;
 }
 
-// Endpoint root dipakai untuk memastikan web server benar-benar bisa dijangkau.
+// =====================================================
+// ENDPOINT /DATA
+// =====================================================
+
+void handleData() {
+
+    updateAllSensors();
+
+    server.sendHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+    );
+
+    server.send(
+        200,
+        "application/json",
+        buildSensorJson()
+    );
+}
+
+// =====================================================
+// ROOT
+// =====================================================
+
 void handleRoot() {
-    server.send(200, "text/plain", "ESP32 Web Server aktif. Coba buka /data untuk melihat JSON sensor.");
+
+    server.send(
+        200,
+        "text/plain",
+        "ESP32 Smart Soil Monitoring aktif. Buka /data untuk melihat data sensor."
+    );
 }
 
-// Menangani halaman yang tidak ditemukan.
+// =====================================================
+// NOT FOUND
+// =====================================================
+
 void handleNotFound() {
-    server.send(404, "text/plain", "Endpoint tidak ditemukan");
+
+    server.send(
+        404,
+        "text/plain",
+        "Endpoint tidak ditemukan"
+    );
 }
 
-// Menghubungkan ESP32 ke WiFi router yang Anda pakai.
-void connectToWiFi() {
-    const unsigned long wifiTimeout = 20000;
-    const unsigned long startAttempt = millis();
+// =====================================================
+// WIFI
+// =====================================================
 
-    Serial.println("Menghubungkan ke WiFi...");
+void connectToWiFi() {
+
+    const unsigned long wifiTimeout = 20000;
+
+    const unsigned long startAttempt =
+        millis();
+
+    Serial.println();
+
+    Serial.println(
+        "Menghubungkan ke WiFi..."
+    );
+
     Serial.print("SSID: ");
+
     Serial.println(ssid);
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
 
-    while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiTimeout) {
+    WiFi.begin(
+        ssid,
+        password
+    );
+
+    while (
+        WiFi.status() != WL_CONNECTED &&
+        millis() - startAttempt < wifiTimeout
+    ) {
+
         delay(500);
+
         Serial.print(".");
     }
 
     Serial.println();
 
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("WiFi berhasil terhubung");
-        Serial.print("Alamat IP ESP32: ");
-        Serial.println(WiFi.localIP());
-        Serial.println("Gunakan IP ini di browser atau file Website/script.js");
+    if (
+        WiFi.status() ==
+        WL_CONNECTED
+    ) {
+
+        Serial.println(
+            "WiFi berhasil terhubung"
+        );
+
+        Serial.print(
+            "Alamat IP ESP32: "
+        );
+
+        Serial.println(
+            WiFi.localIP()
+        );
+
     } else {
-        Serial.println("WiFi belum terhubung");
-        Serial.println("Periksa SSID dan password, lalu upload ulang");
+
+        Serial.println(
+            "WiFi belum terhubung"
+        );
+
+        Serial.println(
+            "Periksa SSID dan password"
+        );
     }
 }
 
-// Menyiapkan endpoint-endpoint web server.
+// =====================================================
+// SETUP SERVER ESP32
+// =====================================================
+
 void setupServer() {
-    server.on("/", HTTP_GET, handleRoot);
-    server.on("/data", HTTP_GET, handleData);
-    server.onNotFound(handleNotFound);
+
+    server.on(
+        "/",
+        HTTP_GET,
+        handleRoot
+    );
+
+    server.on(
+        "/data",
+        HTTP_GET,
+        handleData
+    );
+
+    server.onNotFound(
+        handleNotFound
+    );
+
     server.begin();
 
-    Serial.println("Web Server aktif pada port 80");
-    Serial.println("Endpoint tersedia: /");
-    Serial.println("Endpoint tersedia: /data");
+    Serial.println(
+        "Web Server aktif pada port 80"
+    );
+
+    Serial.println(
+        "Endpoint tersedia: /"
+    );
+
+    Serial.println(
+        "Endpoint tersedia: /data"
+    );
 }
 
-bool beginHttpClient(HTTPClient& http, const String& targetUrl) {
-    if (targetUrl.startsWith("https://")) {
+// =====================================================
+// HTTP CLIENT
+// =====================================================
+
+bool beginHttpClient(
+    HTTPClient& http,
+    const String& targetUrl
+) {
+
+    if (
+        targetUrl.startsWith(
+            "https://"
+        )
+    ) {
+
         secureWifiClient.setInsecure();
-        http.begin(secureWifiClient, targetUrl);
+
+        http.begin(
+            secureWifiClient,
+            targetUrl
+        );
+
         http.setTimeout(15000);
+
         return true;
     }
 
-    http.begin(wifiClient, targetUrl);
+    http.begin(
+        wifiClient,
+        targetUrl
+    );
+
     http.setTimeout(15000);
+
     return true;
 }
 
-// Mengirim data sensor ke backend Railway dengan metode POST JSON.
+// =====================================================
+// KIRIM DATA KE SERVER
+// =====================================================
+
 void sendDataToServer() {
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("Gagal kirim data: WiFi belum terhubung");
+
+    if (
+        WiFi.status() !=
+        WL_CONNECTED
+    ) {
+
+        Serial.println(
+            "Gagal kirim data: WiFi belum terhubung"
+        );
+
         return;
     }
 
-    HTTPClient http;
-    String targetUrl = String(serverUrl);
-    String jsonPayload = "{";
-    jsonPayload += "\"kelembaban\":" + String(moisturePercent) + ",";
-    jsonPayload += "\"status\":\"" + soilStatus + "\",";
-    jsonPayload += "\"adc\":" + String(adcValue);
-    jsonPayload += "}";
-    int httpResponseCode = -1;
-
-    beginHttpClient(http, targetUrl);
-
-    http.addHeader("Content-Type", "application/json");
-    httpResponseCode = http.POST(jsonPayload);
-
-    Serial.print("Kirim data ke server: ");
-    Serial.println(targetUrl);
-    Serial.print("Payload JSON: ");
-    Serial.println(jsonPayload);
-    Serial.print("HTTP Response: ");
-    Serial.println(httpResponseCode);
-
-    if (httpResponseCode <= 0) {
-        Serial.print("Keterangan Error: ");
-        Serial.println(http.errorToString(httpResponseCode));
-        Serial.println("Kemungkinan masalah: URL Railway salah, service belum aktif, atau koneksi HTTPS gagal");
-    } else {
-        Serial.println("Data berhasil dikirim ke backend");
-        Serial.print("Respons Server: ");
-        Serial.println(http.getString());
-    }
-
-    http.end();
-}
-
-// Menguji konektivitas dasar ke backend sebelum mengirim data sensor.
-void testBackendConnection() {
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("Tes backend gagal: WiFi belum terhubung");
-        return;
-    }
+    // Baca semua sensor
+    updateAllSensors();
 
     HTTPClient http;
-    String targetUrl = String(pingUrl);
+
+    String targetUrl =
+        String(serverUrl);
+
+    String jsonPayload =
+        buildSensorJson();
+
     int httpResponseCode = -1;
 
-    beginHttpClient(http, targetUrl);
-    httpResponseCode = http.GET();
+    beginHttpClient(
+        http,
+        targetUrl
+    );
 
-    Serial.print("Tes koneksi backend: ");
-    Serial.println(targetUrl);
-    Serial.print("HTTP Response Ping: ");
-    Serial.println(httpResponseCode);
+    http.addHeader(
+        "Content-Type",
+        "application/json"
+    );
 
-    if (httpResponseCode > 0) {
-        String responseBody = http.getString();
-        Serial.print("Respons Ping: ");
-        Serial.println(responseBody);
-    } else {
-        Serial.print("Error Ping: ");
-        Serial.println(http.errorToString(httpResponseCode));
-    }
-
-    http.end();
-}
-
-void setup() {
-    Serial.begin(9600);
-    delay(2000);
+    httpResponseCode =
+        http.POST(
+            jsonPayload
+        );
 
     Serial.println();
-    Serial.println("Booting ESP32...");
-    Serial.println("Memulai sistem monitoring kelembaban tanah...");
+    Serial.println(
+        "========== SERVER =========="
+    );
+
+    Serial.print(
+        "URL: "
+    );
+
+    Serial.println(
+        targetUrl
+    );
+
+    Serial.print(
+        "Payload: "
+    );
+
+    Serial.println(
+        jsonPayload
+    );
+
+    Serial.print(
+        "HTTP Response: "
+    );
+
+    Serial.println(
+        httpResponseCode
+    );
+
+    if (
+        httpResponseCode <= 0
+    ) {
+
+        Serial.print(
+            "Keterangan Error: "
+        );
+
+        Serial.println(
+            http.errorToString(
+                httpResponseCode
+            )
+        );
+
+    } else {
+
+        Serial.println(
+            "Data berhasil dikirim ke backend"
+        );
+
+        Serial.print(
+            "Respons Server: "
+        );
+
+        Serial.println(
+            http.getString()
+        );
+    }
+
+    Serial.println(
+        "============================"
+    );
+
+    http.end();
+}
+
+// =====================================================
+// TEST BACKEND
+// =====================================================
+
+void testBackendConnection() {
+
+    if (
+        WiFi.status() !=
+        WL_CONNECTED
+    ) {
+
+        Serial.println(
+            "Tes backend gagal: WiFi belum terhubung"
+        );
+
+        return;
+    }
+
+    HTTPClient http;
+
+    String targetUrl =
+        String(pingUrl);
+
+    int httpResponseCode = -1;
+
+    beginHttpClient(
+        http,
+        targetUrl
+    );
+
+    httpResponseCode =
+        http.GET();
+
+    Serial.println();
+
+    Serial.print(
+        "Tes backend: "
+    );
+
+    Serial.println(
+        targetUrl
+    );
+
+    Serial.print(
+        "HTTP Response: "
+    );
+
+    Serial.println(
+        httpResponseCode
+    );
+
+    if (
+        httpResponseCode > 0
+    ) {
+
+        String responseBody =
+            http.getString();
+
+        Serial.print(
+            "Respons: "
+        );
+
+        Serial.println(
+            responseBody
+        );
+
+    } else {
+
+        Serial.print(
+            "Error: "
+        );
+
+        Serial.println(
+            http.errorToString(
+                httpResponseCode
+            )
+        );
+    }
+
+    http.end();
+}
+
+// =====================================================
+// SETUP
+// =====================================================
+
+void setup() {
+
+    Serial.begin(115200);
+
+    delay(2000);
+
+    // GPIO multiplexer
+    pinMode(
+        muxS0Pin,
+        OUTPUT
+    );
+
+    pinMode(
+        muxS1Pin,
+        OUTPUT
+    );
+
+    pinMode(
+        muxS2Pin,
+        OUTPUT
+    );
+
+    pinMode(
+        muxS3Pin,
+        OUTPUT
+    );
+
+    // ADC ESP32 12-bit
+    analogReadResolution(12);
+
+    Serial.println();
+
+    Serial.println(
+        "================================"
+    );
+
+    Serial.println(
+        "SMART SOIL MONITORING SYSTEM"
+    );
+
+    Serial.println(
+        "================================"
+    );
+
+    Serial.println(
+        "CD74HC4067"
+    );
+
+    Serial.println(
+        "SIG = GPIO34"
+    );
+
+    Serial.println(
+        "S0  = GPIO14"
+    );
+
+    Serial.println(
+        "S1  = GPIO27"
+    );
+
+    Serial.println(
+        "S2  = GPIO26"
+    );
+
+    Serial.println(
+        "S3  = GPIO25"
+    );
+
+    Serial.println();
+
+    Serial.printf(
+        "Sensor 1 | CH%u | Dry=%d | Wet=%d\n",
+        sensor1Config.channel,
+        sensor1Config.adcDry,
+        sensor1Config.adcWet
+    );
+
+    Serial.printf(
+        "Sensor 2 | CH%u | Dry=%d | Wet=%d\n",
+        sensor2Config.channel,
+        sensor2Config.adcDry,
+        sensor2Config.adcWet
+    );
+
+    Serial.printf(
+        "Sensor 3 | CH%u | Dry=%d | Wet=%d\n",
+        sensor3Config.channel,
+        sensor3Config.adcDry,
+        sensor3Config.adcWet
+    );
+
+    Serial.printf(
+        "Sensor 4 | CH%u | Dry=%d | Wet=%d\n",
+        sensor4Config.channel,
+        sensor4Config.adcDry,
+        sensor4Config.adcWet
+    );
+
+    Serial.println();
 
     connectToWiFi();
+
     setupServer();
+
     testBackendConnection();
 }
 
+// =====================================================
+// LOOP
+// =====================================================
+
 void loop() {
-    // Selalu dengarkan request dari browser atau client lain.
+
+    // Menangani request /data
     server.handleClient();
 
-    // Tampilkan pembacaan sensor ke Serial Monitor setiap 2 detik.
     static unsigned long lastSerialUpdate = 0;
-    const unsigned long serialInterval = 2000;
+
     static unsigned long lastServerUpdate = 0;
-    const unsigned long serverInterval = 5000;
 
-    if (millis() - lastSerialUpdate >= serialInterval) {
+    // ================================================
+    // SERIAL MONITOR
+    // ================================================
+
+    if (
+        millis() - lastSerialUpdate >=
+        serialInterval
+    ) {
+
         lastSerialUpdate = millis();
-        readSoilSensor();
 
-        Serial.println("----- Data Sensor -----");
-        Serial.print("Status WiFi: ");
-        Serial.println(WiFi.status() == WL_CONNECTED ? "Terhubung" : "Terputus");
-        Serial.print("IP ESP32: ");
-        Serial.println(WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "Belum tersedia");
-        Serial.print("Nilai ADC: ");
-        Serial.println(adcValue);
-        Serial.print("Kelembaban: ");
-        Serial.print(moisturePercent);
-        Serial.println("%");
-        Serial.print("Status Tanah: ");
-        Serial.println(soilStatus);
-        Serial.println("-----------------------");
+        updateAllSensors();
+
+        Serial.println();
+
+        Serial.println(
+            "========== DATA SENSOR =========="
+        );
+
+        Serial.print(
+            "WiFi: "
+        );
+
+        Serial.println(
+            WiFi.status() ==
+            WL_CONNECTED
+                ? "Terhubung"
+                : "Terputus"
+        );
+
+        Serial.print(
+            "IP ESP32: "
+        );
+
+        Serial.println(
+            WiFi.status() ==
+            WL_CONNECTED
+                ? WiFi.localIP().toString()
+                : "Belum tersedia"
+        );
+
+        Serial.printf(
+            "Sensor 1 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
+            sensor1.channel,
+            sensor1.adcValue,
+            sensor1.moisturePercent,
+            sensor1.soilStatus.c_str()
+        );
+
+        Serial.printf(
+            "Sensor 2 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
+            sensor2.channel,
+            sensor2.adcValue,
+            sensor2.moisturePercent,
+            sensor2.soilStatus.c_str()
+        );
+
+        Serial.printf(
+            "Sensor 3 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
+            sensor3.channel,
+            sensor3.adcValue,
+            sensor3.moisturePercent,
+            sensor3.soilStatus.c_str()
+        );
+
+        Serial.printf(
+            "Sensor 4 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
+            sensor4.channel,
+            sensor4.adcValue,
+            sensor4.moisturePercent,
+            sensor4.soilStatus.c_str()
+        );
+
+        Serial.println(
+            "================================="
+        );
     }
 
-    // Kirim data ke backend secara berkala agar dashboard bisa dipantau dari internet lain.
-    if (millis() - lastServerUpdate >= serverInterval) {
+    // ================================================
+    // KIRIM KE SERVER
+    // ================================================
+
+    if (
+        millis() - lastServerUpdate >=
+        serverInterval
+    ) {
+
         lastServerUpdate = millis();
-        readSoilSensor();
+
         sendDataToServer();
     }
 }

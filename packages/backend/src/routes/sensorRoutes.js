@@ -1,11 +1,33 @@
 import { Router } from "express";
-import { config } from "../config/supabase.js";
+import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp } from "../utils/dateHelper.js";
 import { validateSensorId } from "../utils/validators.js";
-import { getRecentLogs } from "../services/sensorService.js";
+import { getRecentLogs, insertSensorReadings } from "../services/sensorService.js";
 
 const router = Router();
 
+// -----------------------------
+// POST /api/sensors
+// Menerima data dari ESP32 dan menyimpan ke Supabase
+// -----------------------------
+router.post("/", async (req, res, next) => {
+  try {
+    const body = req.body;
+
+    if (!body || typeof body !== "object") {
+      return res.status(400).json({ message: "Payload tidak valid." });
+    }
+
+    const results = await insertSensorReadings(body);
+    return res.status(201).json({ message: "Data sensor berhasil disimpan.", results });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// -----------------------------
+// GET /api/sensors/:sensorId/recent-logs
+// -----------------------------
 router.get("/:sensorId/recent-logs", async (req, res, next) => {
   try {
     const sensorId = validateSensorId(req.params.sensorId);
