@@ -112,7 +112,7 @@ export const getSensorData = async (sensorId) => {
       ? null
       : Number(latestReading.temperature),
     sensorStatus: sensorResponse.data?.status || "Unknown",
-    isOnline: minutesSinceLastReading <= 5,
+    isOnline: minutesSinceLastReading <= 1,
     lastSeen: lastSeenDate,
     status: getMoistureStatus(Number(latestReading.moisture)),
     chart: data.map((reading) => ({

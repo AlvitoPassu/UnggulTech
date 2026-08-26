@@ -26,13 +26,23 @@ const DashboardPage = () => {
       return;
     }
 
-    getSensorData(selectedSensorId).then((data) => {
-      setSensorData(data);
-    });
+    // Fetch data pertama kali
+    const fetchData = () => {
+      getSensorData(selectedSensorId).then((data) => {
+        setSensorData(data);
+      });
 
-    getRecentLogs(selectedSensorId).then((data) => {
-      setRecentLogs(data);
-    });
+      getRecentLogs(selectedSensorId).then((data) => {
+        setRecentLogs(data);
+      });
+    };
+
+    fetchData();
+
+    // Auto-refresh setiap 30 detik untuk update status Aktif/Tidak Aktif
+    const interval = setInterval(fetchData, 30_000);
+
+    return () => clearInterval(interval);
   }, [selectedSensorId]);
 
   return (
