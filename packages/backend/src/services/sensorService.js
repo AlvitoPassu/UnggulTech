@@ -76,12 +76,10 @@ export async function insertSensorReadings(payload) {
     }
 
     const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
-    const status = sensorData.status ?? null;
 
     const record = {
       sensor_id: sensorId,
       moisture: Number.isFinite(moisture) ? moisture : null,
-      [config.statusColumn]: status,
     };
 
     const { data, error } = await supabase
