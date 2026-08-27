@@ -77,13 +77,26 @@ export const getRecentLogs = async (sensorId) => {
 // -----------------------------
 // GET DASHBOARD DATA
 // -----------------------------
+const CHART_DATA_LIMIT = 10;
+
 export const getSensorData = async (sensorId) => {
-  const [readingsResponse, sensorResponse] = await Promise.all([
+  const [latestResponse, chartResponse, sensorResponse] = await Promise.all([
+    // Data terbaru untuk summary cards (1 row)
     supabase
       .from("sensor_readings")
       .select("id, moisture, temperature, humidity, created_at")
       .eq("sensor_id", sensorId)
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single(),
+    // 10 data terbaru untuk grafik (descending, lalu dibalik)
+    supabase
+      .from("sensor_readings")
+      .select("id, moisture, created_at")
+      .eq("sensor_id", sensorId)
+      .order("created_at", { ascending: false })
+      .limit(CHART_DATA_LIMIT),
+    // Status sensor
     supabase
       .from("sensors")
       .select("status")
@@ -91,31 +104,26 @@ export const getSensorData = async (sensorId) => {
       .single(),
   ]);
 
-  const { data, error } = readingsResponse;
+  const { data: latest, error } = latestResponse;
 
-  if (error) {
-    console.error("Error mengambil pembacaan sensor:", error);
+  if (error || !latest) {
     return null;
   }
 
-  if (!data.length) {
-    return null;
-  }
-
-  const latestReading = data[data.length - 1];
-  const lastSeenDate = new Date(latestReading.created_at);
+  const lastSeenDate = new Date(latest.created_at);
   const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
 
+  // Balik urutan chart dari descending → ascending agar grafik mengalir kiri ke kanan
+  const chartData = (chartResponse.data ?? []).reverse();
+
   return {
-    moisture: Number(latestReading.moisture),
-    temperature: latestReading.temperature === null
-      ? null
-      : Number(latestReading.temperature),
+    moisture: Number(latest.moisture),
+    temperature: latest.temperature === null ? null : Number(latest.temperature),
     sensorStatus: sensorResponse.data?.status || "Unknown",
     isOnline: minutesSinceLastReading <= 1,
     lastSeen: lastSeenDate,
-    status: getMoistureStatus(Number(latestReading.moisture)),
-    chart: data.map((reading) => ({
+    status: getMoistureStatus(Number(latest.moisture)),
+    chart: chartData.map((reading) => ({
       time: formatTime(reading.created_at),
       moisture: Number(reading.moisture),
     })),
