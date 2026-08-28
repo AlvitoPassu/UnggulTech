@@ -56,6 +56,13 @@ const getMoistureStatus = (moisture) => {
   return "Normal";
 };
 
+const getHumidityStatus = (humidity) => {
+  if (humidity === null) return "Tidak tersedia";
+  if (humidity < 40) return "Kering";
+  if (humidity > 80) return "Sangat Lembab";
+  return "Normal";
+};
+
 const formatTime = (date) => {
   return new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Makassar",
@@ -116,9 +123,13 @@ export const getSensorData = async (sensorId) => {
   // Balik urutan chart dari descending → ascending agar grafik mengalir kiri ke kanan
   const chartData = (chartResponse.data ?? []).reverse();
 
+  const humidityValue = latest.humidity === null ? null : Number(latest.humidity);
+
   return {
     moisture: Number(latest.moisture),
     temperature: latest.temperature === null ? null : Number(latest.temperature),
+    humidity: humidityValue,
+    humidityStatus: getHumidityStatus(humidityValue),
     sensorStatus: sensorResponse.data?.status || "Unknown",
     isOnline: minutesSinceLastReading <= 1,
     lastSeen: lastSeenDate,

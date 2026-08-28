@@ -56,7 +56,8 @@ export async function getRecentLogs(sensorId) {
  * {
  *   "sensor1": { "channel": 0, "kelembaban": 55, "status": "Lembab", "adc": 2800 },
  *   "sensor2": { ... },
- *   ...
+ *   ...,
+ *   "dht11": { "suhu": 28.5, "kelembaban_udara": 72.0, "valid": true }
  * }
  */
 export async function insertSensorReadings(payload) {
@@ -79,6 +80,13 @@ export async function insertSensorReadings(payload) {
 
     const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
 
+    // Ambil data DHT11 dari payload (berlaku untuk semua sensor dalam satu pengiriman)
+    const dht11 = payload.dht11;
+    const temperatureRaw = dht11?.valid ? (dht11.suhu ?? dht11.temperature ?? null) : null;
+    const humidityRaw = dht11?.valid ? (dht11.kelembaban_udara ?? dht11.humidity ?? null) : null;
+    const temperature = temperatureRaw !== null && Number.isFinite(Number(temperatureRaw)) ? Number(temperatureRaw) : null;
+    const humidity = humidityRaw !== null && Number.isFinite(Number(humidityRaw)) ? Number(humidityRaw) : null;
+
     // Auto-daftarkan sensor ke tabel sensors jika belum ada
     // Jika sudah ada, tidak mengubah data yang sudah ada (ignoreDuplicates: true)
     const sensorNum = sensorId;
@@ -97,6 +105,8 @@ export async function insertSensorReadings(payload) {
     const record = {
       sensor_id: sensorId,
       moisture: Number.isFinite(moisture) ? moisture : null,
+      temperature,
+      humidity,
     };
 
     const { data, error } = await supabase

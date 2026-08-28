@@ -47,17 +47,24 @@ const SummaryCards = ({ sensorData }) => {
           badge: null,
         },
         {
+          title: "Air Humidity",
+          value: sensorData.humidity === null ? "-" : `${sensorData.humidity}%`,
+          status: sensorData.humidityStatus ?? "Tidak tersedia",
+          icon: summaryData[2].icon,
+          badge: null,
+        },
+        {
           title: "Sensor Status",
           value: isOnline ? "Aktif" : "Tidak Aktif",
           status: sensorData.lastSeen ? `Terakhir: ${formatLastSeen(sensorData.lastSeen)}` : "Belum ada data",
-          icon: summaryData[2].icon,
+          icon: summaryData[3].icon,
           badge: <StatusBadge isOnline={isOnline} />,
         },
       ]
     : summaryData.map((item) => ({ ...item, badge: null }));
 
   return (
-    <div className="grid grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
       {cards.map((item, index) => {
         const Icon = item.icon;
 
@@ -83,3 +90,4 @@ const SummaryCards = ({ sensorData }) => {
 };
 
 export default SummaryCards;
+

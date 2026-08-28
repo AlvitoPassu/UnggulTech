@@ -3,6 +3,7 @@
 #include <WiFiClientSecure.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <DHT.h>
 
 // =====================================================
 // WIFI
@@ -22,6 +23,18 @@ const char* serverUrl =
 // Endpoint health check backend
 const char* pingUrl =
     "https://unggulmonitoring.com/health";
+
+// =====================================================
+// DHT11
+// JANGAN UBAH WIRING INI
+// =====================================================
+
+// DATA -> GPIO32
+
+#define DHT_PIN  32
+#define DHT_TYPE DHT11
+
+DHT dht(DHT_PIN, DHT_TYPE);
 
 // =====================================================
 // CD74HC4067
@@ -76,6 +89,25 @@ struct SensorReading {
 
     String soilStatus;
 };
+
+// =====================================================
+// STRUKTUR DHT11
+// =====================================================
+
+struct DhtReading {
+
+    float temperature; // Celsius
+
+    float humidity;    // Persen RH
+
+    bool valid;        // true jika pembacaan berhasil
+};
+
+// =====================================================
+// DATA DHT11
+// =====================================================
+
+DhtReading dhtData = { 0.0f, 0.0f, false };
 
 // =====================================================
 // KONFIGURASI KALIBRASI SENSOR
@@ -214,6 +246,34 @@ String getSoilStatus(int kelembaban) {
 }
 
 // =====================================================
+// BACA SENSOR DHT11
+// =====================================================
+
+DhtReading readDht() {
+
+    DhtReading reading;
+
+    reading.temperature = dht.readTemperature();
+
+    reading.humidity    = dht.readHumidity();
+
+    // isnan() mendeteksi nilai NaN jika DHT gagal baca
+    reading.valid = (
+        !isnan(reading.temperature) &&
+        !isnan(reading.humidity)
+    );
+
+    if (!reading.valid) {
+
+        reading.temperature = 0.0f;
+
+        reading.humidity    = 0.0f;
+    }
+
+    return reading;
+}
+
+// =====================================================
 // PILIH CHANNEL MULTIPLEXER
 // =====================================================
 
@@ -324,6 +384,9 @@ void updateAllSensors() {
 
     sensor4 =
         readSoilSensor(sensor4Config);
+
+    // Baca DHT11
+    dhtData = readDht();
 }
 
 // =====================================================
@@ -439,6 +502,29 @@ String buildSensorJson() {
 
     json += "\"adc\":";
     json += String(sensor4.adcValue);
+
+    json += "}";
+
+    // -------------------------------------------------
+    // DHT11
+    // -------------------------------------------------
+
+    json += ",";
+
+    json += "\"dht11\":{";
+
+    json += "\"suhu\":";
+    json += String(dhtData.temperature, 1);
+
+    json += ",";
+
+    json += "\"kelembaban_udara\":";
+    json += String(dhtData.humidity, 1);
+
+    json += ",";
+
+    json += "\"valid\":";
+    json += dhtData.valid ? "true" : "false";
 
     json += "}";
 
@@ -863,6 +949,9 @@ void setup() {
     // ADC ESP32 12-bit
     analogReadResolution(12);
 
+    // Inisialisasi DHT11
+    dht.begin();
+
     Serial.println();
 
     Serial.println(
@@ -899,6 +988,14 @@ void setup() {
 
     Serial.println(
         "S3  = GPIO25"
+    );
+
+    Serial.println(
+        "DHT11"
+    );
+
+    Serial.println(
+        "DATA = GPIO32"
     );
 
     Serial.println();
@@ -1024,6 +1121,13 @@ void loop() {
             sensor4.adcValue,
             sensor4.moisturePercent,
             sensor4.soilStatus.c_str()
+        );
+
+        Serial.printf(
+            "DHT11  | Suhu: %.1f C | Kelembaban Udara: %.1f%% | %s\n",
+            dhtData.temperature,
+            dhtData.humidity,
+            dhtData.valid ? "OK" : "Gagal baca"
         );
 
         Serial.println(
