@@ -59,15 +59,13 @@ constexpr int muxS3Pin = 25;
 
 constexpr uint8_t sensor1Channel = 0; // CH0
 constexpr uint8_t sensor2Channel = 1; // CH1
-constexpr uint8_t sensor3Channel = 2; // CH2
-constexpr uint8_t sensor4Channel = 3; // CH3
 
 // =====================================================
 // INTERVAL
 // =====================================================
 
-constexpr unsigned long serialInterval = 2000;
-constexpr unsigned long serverInterval = 5000;
+constexpr unsigned long serialInterval = 5000;   // Serial monitor tiap 5 detik (debug lokal)
+constexpr unsigned long serverInterval = 60000;  // Kirim ke server tiap 1 menit
 
 // Jumlah pembacaan ADC setiap sensor
 constexpr uint8_t sensorSamplesPerRead = 8;
@@ -138,61 +136,35 @@ WiFiClientSecure secureWifiClient;
 // KALIBRASI SENSOR
 // =====================================================
 
-// Sensor 1
-// map(adcValue, 4095, 1722, 0, 100)
+// Sensor 1 - Capacitive v2.0
+// map(adcValue, 2936, 2422, 0, 100)
 
 constexpr SensorConfig sensor1Config = {
 
     sensor1Channel,
 
-    4095,
+    2936,
 
-    1722,
+    2422,
 
     "Sensor 1"
 };
 
-// Sensor 2
-// map(adcValue, 4095, 1378, 0, 100)
+// Sensor 2 - Capacitive v2.0
+// map(adcValue, 2936, 2422, 0, 100)
 
 constexpr SensorConfig sensor2Config = {
 
     sensor2Channel,
 
-    4095,
+    2936,
 
-    1378,
+    2422,
 
     "Sensor 2"
 };
 
-// Sensor 3
-// map(adcValue, 4095, 1371, 0, 100)
 
-constexpr SensorConfig sensor3Config = {
-
-    sensor3Channel,
-
-    4095,
-
-    1371,
-
-    "Sensor 3"
-};
-
-// Sensor 4
-// map(adcValue, 4095, 1704, 0, 100)
-
-constexpr SensorConfig sensor4Config = {
-
-    sensor4Channel,
-
-    4095,
-
-    1704,
-
-    "Sensor 4"
-};
 
 // =====================================================
 // DATA SENSOR
@@ -212,19 +184,7 @@ SensorReading sensor2 = {
     "Tidak tersedia"
 };
 
-SensorReading sensor3 = {
-    sensor3Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
 
-SensorReading sensor4 = {
-    sensor4Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
 
 // =====================================================
 // STATUS TANAH
@@ -379,12 +339,6 @@ void updateAllSensors() {
     sensor2 =
         readSoilSensor(sensor2Config);
 
-    sensor3 =
-        readSoilSensor(sensor3Config);
-
-    sensor4 =
-        readSoilSensor(sensor4Config);
-
     // Baca DHT11
     dhtData = readDht();
 }
@@ -448,60 +402,6 @@ String buildSensorJson() {
 
     json += "\"adc\":";
     json += String(sensor2.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 3
-    // -------------------------------------------------
-
-    json += "\"sensor3\":{";
-
-    json += "\"channel\":";
-    json += String(sensor3.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor3.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor3.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor3.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 4
-    // -------------------------------------------------
-
-    json += "\"sensor4\":{";
-
-    json += "\"channel\":";
-    json += String(sensor4.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor4.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor4.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor4.adcValue);
 
     json += "}";
 
@@ -1014,19 +914,7 @@ void setup() {
         sensor2Config.adcWet
     );
 
-    Serial.printf(
-        "Sensor 3 | CH%u | Dry=%d | Wet=%d\n",
-        sensor3Config.channel,
-        sensor3Config.adcDry,
-        sensor3Config.adcWet
-    );
 
-    Serial.printf(
-        "Sensor 4 | CH%u | Dry=%d | Wet=%d\n",
-        sensor4Config.channel,
-        sensor4Config.adcDry,
-        sensor4Config.adcWet
-    );
 
     Serial.println();
 
@@ -1107,21 +995,7 @@ void loop() {
             sensor2.soilStatus.c_str()
         );
 
-        Serial.printf(
-            "Sensor 3 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor3.channel,
-            sensor3.adcValue,
-            sensor3.moisturePercent,
-            sensor3.soilStatus.c_str()
-        );
 
-        Serial.printf(
-            "Sensor 4 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor4.channel,
-            sensor4.adcValue,
-            sensor4.moisturePercent,
-            sensor4.soilStatus.c_str()
-        );
 
         Serial.printf(
             "DHT11  | Suhu: %.1f C | Kelembaban Udara: %.1f%% | %s\n",
