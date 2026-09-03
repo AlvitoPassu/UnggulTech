@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { getForecast, getLocation } from "../../api/weatherApi";
 import {
   WiDaySunny,
@@ -58,15 +58,16 @@ const WeatherCard = () => {
 
   const current = forecasts[0];
   const rest = forecasts.slice(1);
-  const Icon = current ? getWeatherIcon(current.weather) : WiDaySunny;
-
   return (
-    <div className="bg-white rounded-xl shadow-md p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold">Prakiraan Cuaca</h3>
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Prakiraan Cuaca</h3>
+          <p className="mt-1 text-xs text-slate-500">Kondisi lingkungan sekitar</p>
+        </div>
         {location && (
-          <span className="flex items-center gap-1 text-sm text-gray-500">
-            <FaMapMarkerAlt className="text-green-500" />
+          <span className="flex items-center gap-1 text-right text-xs text-slate-500">
+            <FaMapMarkerAlt className="shrink-0 text-green-600" aria-hidden="true" />
             {location.desa}, {location.kecamatan}
           </span>
         )}
@@ -83,12 +84,12 @@ const WeatherCard = () => {
       ) : (
         <>
           {/* Cuaca saat ini */}
-          <div className="flex items-center gap-4 mb-5">
-            <Icon className="text-6xl text-yellow-500 shrink-0" />
+          <div className="mb-5 flex items-center gap-4">
+            {createElement(current ? getWeatherIcon(current.weather) : WiDaySunny, { className: "shrink-0 text-6xl text-yellow-500", "aria-hidden": true })}
             <div>
-              <p className="text-4xl font-bold text-gray-800">{current.temperature}°C</p>
-              <p className="text-gray-500 capitalize">{current.weather}</p>
-              <div className="flex gap-4 mt-1 text-sm text-gray-500">
+              <p className="text-3xl font-bold tracking-tight text-slate-900">{current.temperature}°C</p>
+              <p className="capitalize text-slate-500">{current.weather}</p>
+              <div className="mt-1 flex gap-4 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
                   <WiHumidity className="text-blue-400 text-lg" />
                   {current.humidity}%
@@ -103,7 +104,7 @@ const WeatherCard = () => {
 
           {/* Prakiraan berikutnya */}
           {rest.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 border-t pt-4">
+            <div className="grid grid-cols-3 gap-2 border-t border-slate-200 pt-4">
               {rest.map((f, i) => {
                 const SlotIcon = getWeatherIcon(f.weather);
                 return (
@@ -121,7 +122,7 @@ const WeatherCard = () => {
           )}
         </>
       )}
-    </div>
+    </section>
   );
 };
 

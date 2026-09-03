@@ -2,9 +2,34 @@ import { Router } from "express";
 import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp } from "../utils/dateHelper.js";
 import { validateSensorId } from "../utils/validators.js";
-import { getRecentLogs, insertSensorReadings } from "../services/sensorService.js";
+import { getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
 
 const router = Router();
+
+// GET /api/sensors
+router.get("/", async (_req, res, next) => {
+  try {
+    return res.json(await getSensors());
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/overview", async (_req, res, next) => {
+  try {
+    return res.json(await getNurseryOverview());
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/moisture-trend", async (req, res, next) => {
+  try {
+    return res.json(await getNurseryMoistureTrend(req.query.period));
+  } catch (error) {
+    next(error);
+  }
+});
 
 // -----------------------------
 // POST /api/sensors
@@ -46,6 +71,21 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
     }));
 
     return res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/sensors/:sensorId/data
+router.get("/:sensorId/data", async (req, res, next) => {
+  try {
+    const sensorId = validateSensorId(req.params.sensorId);
+
+    if (!sensorId) {
+      return res.status(400).json({ message: "Sensor ID tidak valid." });
+    }
+
+    return res.json(await getSensorData(sensorId));
   } catch (error) {
     next(error);
   }

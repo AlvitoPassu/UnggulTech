@@ -2,7 +2,7 @@ import { summaryData } from "../../data/dashboardData";
 
 const StatusBadge = ({ isOnline }) => (
   <span
-    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
       isOnline
         ? "bg-green-100 text-green-700"
         : "bg-red-100 text-red-700"
@@ -61,7 +61,7 @@ const SummaryCards = ({ sensorData }) => {
           badge: <StatusBadge isOnline={isOnline} />,
         },
       ]
-    : summaryData.map((item) => ({ ...item, badge: null }));
+    : [];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -69,19 +69,19 @@ const SummaryCards = ({ sensorData }) => {
         const Icon = item.icon;
 
         return (
-          <div key={index} className="bg-white rounded-xl p-6 shadow">
-            <div className="flex justify-between items-center">
-              <h3>{item.title}</h3>
+              <div key={index} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-600">{item.title}</h3>
 
-              <Icon className="text-3xl text-green-600" />
+                  <Icon className="text-2xl text-green-700" aria-hidden="true" />
             </div>
 
-            <div className="flex items-center gap-3 mt-3">
-              <h1 className="text-3xl font-bold">{item.value}</h1>
+                <div className="mt-4 flex min-h-10 items-center gap-3">
+                  <p className="text-2xl font-bold tracking-tight text-slate-900">{item.value}</p>
               {item.badge}
             </div>
 
-            <p className="text-sm text-gray-500 mt-1">{item.status}</p>
+                <p className="mt-2 text-xs text-slate-500">{item.status}</p>
           </div>
         );
       })}

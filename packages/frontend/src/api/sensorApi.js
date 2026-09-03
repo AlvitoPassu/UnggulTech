@@ -1,5 +1,4 @@
 import axios from "axios";
-import { supabase } from "../lib/supabase";
 
 export const getSensorDisplayName = (sensor = {}) => {
   const bedenganValue = sensor.bedengan ?? sensor.bedengan_id ?? sensor.bed_id;
@@ -30,18 +29,18 @@ export const sortSensorsByBedengan = (sensors = []) => {
 // GET LIST SENSOR
 // -----------------------------
 export const getSensors = async () => {
-  const { data, error } = await supabase
-    .from("sensors")
-    .select("id, sensor_name, bedengan, location, status")
-    .eq("status", "Active")
-    .order("id", { ascending: true });
+  const response = await axios.get("/api/sensors");
+  return sortSensorsByBedengan(response.data);
+};
 
-  if (error) {
-    console.error("Error mengambil sensor:", error);
-    return [];
-  }
+export const getNurseryOverview = async () => {
+  const response = await axios.get("/api/sensors/overview");
+  return response.data;
+};
 
-  return sortSensorsByBedengan(data);
+export const getNurseryMoistureTrend = async (period = "24h") => {
+  const response = await axios.get("/api/sensors/moisture-trend", { params: { period } });
+  return response.data;
 };
 
 const getMoistureStatus = (moisture) => {
@@ -63,14 +62,6 @@ const getHumidityStatus = (humidity) => {
   return "Normal";
 };
 
-const formatTime = (date) => {
-  return new Intl.DateTimeFormat("id-ID", {
-    timeZone: "Asia/Makassar",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-};
-
 export const getRecentLogs = async (sensorId) => {
   try {
     const response = await axios.get(`/api/sensors/${sensorId}/recent-logs`);
@@ -84,60 +75,15 @@ export const getRecentLogs = async (sensorId) => {
 // -----------------------------
 // GET DASHBOARD DATA
 // -----------------------------
-const CHART_DATA_LIMIT = 10;
-
 export const getSensorData = async (sensorId) => {
-  const [latestResponse, chartResponse, sensorResponse] = await Promise.all([
-    // Data terbaru untuk summary cards (1 row)
-    supabase
-      .from("sensor_readings")
-      .select("id, moisture, temperature, humidity, created_at")
-      .eq("sensor_id", sensorId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single(),
-    // 10 data terbaru untuk grafik (descending, lalu dibalik)
-    supabase
-      .from("sensor_readings")
-      .select("id, moisture, created_at")
-      .eq("sensor_id", sensorId)
-      .order("created_at", { ascending: false })
-      .limit(CHART_DATA_LIMIT),
-    // Status sensor
-    supabase
-      .from("sensors")
-      .select("status")
-      .eq("id", sensorId)
-      .single(),
-  ]);
-
-  const { data: latest, error } = latestResponse;
-
-  if (error || !latest) {
-    return null;
-  }
-
-  const lastSeenDate = new Date(latest.created_at);
-  const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
-
-  // Balik urutan chart dari descending → ascending agar grafik mengalir kiri ke kanan
-  const chartData = (chartResponse.data ?? []).reverse();
-
-  const humidityValue = latest.humidity === null ? null : Number(latest.humidity);
+  const response = await axios.get(`/api/sensors/${sensorId}/data`);
+  const data = response.data;
+  const humidityValue = data.humidity === null || data.humidity === undefined ? null : Number(data.humidity);
 
   return {
-    moisture: Number(latest.moisture),
-    temperature: latest.temperature === null ? null : Number(latest.temperature),
-    humidity: humidityValue,
+    ...data,
     humidityStatus: getHumidityStatus(humidityValue),
-    sensorStatus: sensorResponse.data?.status || "Unknown",
-    isOnline: minutesSinceLastReading <= 1,
-    lastSeen: lastSeenDate,
-    status: getMoistureStatus(Number(latest.moisture)),
-    chart: chartData.map((reading) => ({
-      time: formatTime(reading.created_at),
-      moisture: Number(reading.moisture),
-    })),
+    status: data.status || (data.moisture === null || data.moisture === undefined ? "Tidak tersedia" : getMoistureStatus(Number(data.moisture))),
   };
 };
 

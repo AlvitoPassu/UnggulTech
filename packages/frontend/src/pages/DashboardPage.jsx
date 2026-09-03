@@ -1,125 +1,91 @@
 import { useEffect, useState } from "react";
-import SummaryCards from "../components/Dashboard/SummaryCards";
-import AnalyticsChart from "../components/Dashboard/AnalyticsChart";
-import ConditionStatus from "../components/Dashboard/ConditionStatus";
-import RecentLogs from "../components/Dashboard/RecentLogs";
+import { FiActivity, FiDownload, FiRefreshCw } from "react-icons/fi";
+import AttentionBedengans from "../components/Dashboard/AttentionBedengans";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
+import NurseryMoistureTrend from "../components/Dashboard/NurseryMoistureTrend";
+import NurserySummaryCards from "../components/Dashboard/NurserySummaryCards";
+import SensorStatusOverview from "../components/Dashboard/SensorStatusOverview";
+import SoilMoistureCondition from "../components/Dashboard/SoilMoistureCondition";
 import WeatherCard from "../components/Dashboard/WeatherCard";
-import { getRecentLogs, getSensorData, getSensors, getSensorDisplayName } from "../api/sensorApi";
+import { getNurseryMoistureTrend, getNurseryOverview } from "../api/sensorApi";
 
 const DashboardPage = () => {
-  const [sensors, setSensors] = useState([]);
-  const [selectedSensorId, setSelectedSensorId] = useState("");
-  const [sensorData, setSensorData] = useState(null);
-  const [recentLogs, setRecentLogs] = useState([]);
+  const [overview, setOverview] = useState(null);
+  const [trend, setTrend] = useState([]);
+  const [period, setPeriod] = useState("24h");
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
-    const fetchSensors = () => {
-      getSensors().then((data) => {
-        setSensors(data);
-        // Set sensor pertama hanya saat inisialisasi awal
-        setSelectedSensorId((prev) => prev || data[0]?.id || "");
-      });
+    let isCurrent = true;
+    const fetchOverview = async () => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const [overviewData, trendData] = await Promise.all([
+          getNurseryOverview(),
+          getNurseryMoistureTrend(period),
+        ]);
+        if (isCurrent) {
+          setOverview(overviewData);
+          setTrend(trendData);
+        }
+      } catch {
+        if (isCurrent) {
+          setOverview(null);
+          setTrend([]);
+          setError("Data nursery tidak dapat dimuat.");
+        }
+      } finally {
+        if (isCurrent) setIsLoading(false);
+      }
     };
 
-    fetchSensors();
-
-    // Refresh daftar sensor setiap 60 detik
-    // agar sensor yang baru disambung otomatis muncul
-    const interval = setInterval(fetchSensors, 60_000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSensorId) {
-      return;
-    }
-
-    // Fetch data pertama kali
-    const fetchData = () => {
-      getSensorData(selectedSensorId).then((data) => {
-        setSensorData(data);
-      });
-
-      getRecentLogs(selectedSensorId).then((data) => {
-        setRecentLogs(data);
-      });
+    fetchOverview();
+    const interval = setInterval(fetchOverview, 60_000);
+    return () => {
+      isCurrent = false;
+      clearInterval(interval);
     };
+  }, [period, refreshToken]);
 
-    fetchData();
-
-    // Auto-refresh setiap 30 detik untuk update status Aktif/Tidak Aktif
-    const interval = setInterval(fetchData, 30_000);
-
-    return () => clearInterval(interval);
-  }, [selectedSensorId]);
+  const lastUpdated = overview?.summary?.lastUpdated;
+  const formattedLastUpdated = lastUpdated
+    ? new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(lastUpdated))
+    : "Belum ada data";
+  const sensors = overview?.sensors || [];
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h1 className="text-3xl font-bold">
-          Smart Soil Monitoring System
-        </h1>
-
-        <div className="flex items-center gap-3">
-          <label htmlFor="sensor" className="font-medium">
-            Pilih Bedengan
-          </label>
-
-          <select
-            id="sensor"
-            value={selectedSensorId}
-            onChange={(event) => setSelectedSensorId(event.target.value)}
-            className="bg-white border border-gray-300 rounded-lg px-3 py-2"
-          >
-            {sensors.length === 0 ? (
-              <option value="">Belum ada bedengan aktif</option>
-            ) : (
-              sensors.map((sensor) => (
-                <option key={sensor.id} value={sensor.id}>
-                  {getSensorDisplayName(sensor)}
-                </option>
-              ))
-            )}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => setIsDownloadModalOpen(true)}
-            className="bg-green-600 text-white font-medium rounded-lg px-4 py-2 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-          >
-            Download Data
-          </button>
+    <div className="min-h-screen bg-[#f4f7f3] text-slate-800">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-700 text-white"><FiActivity className="text-xl" aria-hidden="true" /></div>
+            <div><p className="text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p><p className="mt-0.5 text-xs text-slate-500">Overview operasional nursery</p></div>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex items-center gap-2 text-right">
+              <div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p><p className="text-xs font-semibold text-slate-700">{isLoading ? "Memuat data..." : formattedLastUpdated}</p></div>
+              <button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-green-700" aria-label="Refresh data"><FiRefreshCw aria-hidden="true" /></button>
+            </div>
+            <button type="button" onClick={() => setIsDownloadModalOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"><FiDownload aria-hidden="true" />Download Data</button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <SummaryCards sensorData={sensorData} />
+      <main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8">
+        <div className="mb-6"><p className="mb-1 text-sm font-medium text-green-700">Overview kondisi nursery secara real-time</p><h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dashboard</h1></div>
+        {error && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="font-semibold underline underline-offset-2">Refresh</button></div>}
+        {isLoading && <p className="mb-4 text-sm text-slate-500">Memuat data nursery...</p>}
 
-      <div className="grid lg:grid-cols-3 gap-6 mt-6">
-        <div className="lg:col-span-2">
-          <AnalyticsChart data={sensorData?.chart || []} />
-        </div>
+        <NurserySummaryCards summary={overview?.summary} />
+        <div className="mt-6 grid gap-6 xl:grid-cols-2"><SoilMoistureCondition conditions={overview?.summary?.conditions} total={overview?.summary?.totalSensors} /><NurseryMoistureTrend data={trend} period={period} onPeriodChange={setPeriod} /></div>
+        <div className="mt-6 grid gap-6 xl:grid-cols-3"><SensorStatusOverview summary={overview?.summary} /><AttentionBedengans sensors={overview?.attention} /><WeatherCard /></div>
+      </main>
 
-        <div className="flex flex-col gap-6">
-          <ConditionStatus sensorData={sensorData} />
-          <WeatherCard />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <RecentLogs logs={recentLogs} />
-      </div>
-
-      {isDownloadModalOpen && (
-        <DownloadDataModal
-          sensors={sensors}
-          selectedSensorId={selectedSensorId}
-          onClose={() => setIsDownloadModalOpen(false)}
-        />
-      )}
+      {isDownloadModalOpen && <DownloadDataModal sensors={sensors} selectedSensorId={sensors[0]?.id || ""} onClose={() => setIsDownloadModalOpen(false)} />}
     </div>
   );
 };
