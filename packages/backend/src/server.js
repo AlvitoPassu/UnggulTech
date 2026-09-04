@@ -5,6 +5,7 @@ import { config } from "./config/supabase.js";
 import sensorRoutes from "./routes/sensorRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
+import historicalRoutes from "./routes/historicalRoutes.js";
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/sensors", sensorRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/weather", weatherRoutes);
+app.use("/api/historical-readings", historicalRoutes);
 
 // Global Error Handler
 app.use((error, _req, res, _next) => {

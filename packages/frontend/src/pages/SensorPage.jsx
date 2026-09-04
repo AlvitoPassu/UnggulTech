@@ -12,7 +12,6 @@ import {
   FiActivity,
   FiAlertCircle,
   FiBattery,
-  FiDownload,
   FiInfo,
   FiMapPin,
   FiRefreshCw,
@@ -26,7 +25,6 @@ import {
   getSensors,
   getSensorDisplayName,
 } from "../api/sensorApi";
-import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
 
 const panelClass = "rounded-lg border border-slate-200 bg-white shadow-sm";
 
@@ -63,7 +61,6 @@ const SensorPage = () => {
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchSensors = () => {
@@ -99,18 +96,18 @@ const SensorPage = () => {
   return (
     <div className="min-h-screen bg-[#f4f7f3] text-slate-800">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-5 px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-700 text-white">
               <FiActivity className="text-xl" aria-hidden="true" />
             </div>
-            <div>
-              <p className="text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p>
               <p className="mt-0.5 text-xs text-slate-500">Monitoring detail sensor</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             <div className="hidden items-center gap-2 text-right sm:flex">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p>
@@ -129,10 +126,6 @@ const SensorPage = () => {
                 {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
               </select>
             </div>
-            <button type="button" onClick={() => setIsDownloadModalOpen(true)} className="mt-[18px] inline-flex items-center gap-2 rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2">
-              <FiDownload aria-hidden="true" />
-              Download Data
-            </button>
           </div>
         </div>
       </header>
@@ -216,7 +209,6 @@ const SensorPage = () => {
         <section className={`${panelClass} mt-6 p-5 sm:p-6`}><div className="flex items-start gap-3"><FiAlertCircle className="mt-0.5 text-lg text-slate-400" aria-hidden="true" /><div><h2 className="text-base font-bold text-slate-900">Catatan Status</h2><p className="mt-1 text-sm text-slate-500">{isOnline ? "Sensor sedang mengirimkan pembacaan terbaru." : "Sensor tidak mengirimkan pembacaan dalam periode terakhir."}</p></div></div></section>
       </main>
 
-      {isDownloadModalOpen && <DownloadDataModal sensors={sensors} selectedSensorId={selectedSensorId} onClose={() => setIsDownloadModalOpen(false)} />}
     </div>
   );
 };

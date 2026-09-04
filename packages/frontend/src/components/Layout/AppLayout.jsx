@@ -4,10 +4,10 @@ import { FiActivity, FiBarChart2, FiBell, FiFileText, FiSettings } from "react-i
 const navigationItems = [
   { label: "Dashboard", to: "/", icon: FiBarChart2, end: true },
   { label: "Sensor", to: "/sensor", icon: FiActivity },
+  { label: "Data Historis", to: "/data-historis", icon: FiFileText },
 ];
 
 const secondaryItems = [
-  { label: "Data Historis", icon: FiFileText },
   { label: "Peringatan", icon: FiBell },
   { label: "Laporan", icon: FiFileText },
   { label: "Pengaturan", icon: FiSettings },
