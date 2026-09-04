@@ -2,7 +2,7 @@ import { Router } from "express";
 import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp } from "../utils/dateHelper.js";
 import { validateSensorId } from "../utils/validators.js";
-import { getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
+import { getMoistureStatus, getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
 
 const router = Router();
 
@@ -67,7 +67,7 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
       time: formatWitaTimestamp(log[config.timestampColumn]),
       moisture: log.moisture ?? log.soil_moisture ?? null,
       temperature: log.temperature ?? null,
-      action: log[config.statusColumn] ?? "Sensor Reading",
+      action: getMoistureStatus(log.moisture),
     }));
 
     return res.json(rows);

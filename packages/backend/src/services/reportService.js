@@ -3,6 +3,14 @@ import PDFDocument from "pdfkit";
 import { config } from "../config/supabase.js";
 import { formatWitaTimestamp, witaDateFormatter } from "../utils/dateHelper.js";
 
+const getMoistureStatus = (moisture) => {
+  const value = Number(moisture);
+  if (!Number.isFinite(value)) return "Tidak tersedia";
+  if (value < 40) return "Low";
+  if (value > 70) return "High";
+  return "Normal";
+};
+
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 
 export const makeFilename = (sensorId, startDate, endDate, format) =>
@@ -13,7 +21,7 @@ export function reportRows(logs) {
     timestamp: formatWitaTimestamp(log[config.timestampColumn]),
     moisture: log.moisture ?? log.soil_moisture ?? "",
     temperature: log.temperature ?? "",
-    status: log[config.statusColumn] ?? "",
+    status: log[config.statusColumn] ?? getMoistureStatus(log.moisture ?? log.soil_moisture),
     pump: log.pump ?? log.pump_status ?? "",
   }));
 }

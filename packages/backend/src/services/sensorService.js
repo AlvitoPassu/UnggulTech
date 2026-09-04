@@ -12,6 +12,14 @@ try {
   sensorIdMap = { sensor1: 1, sensor2: 2, sensor3: 3, sensor4: 4 };
 }
 
+export const getMoistureStatus = (moisture) => {
+  const value = Number(moisture);
+  if (!Number.isFinite(value)) return "Tidak tersedia";
+  if (value < 40) return "Low";
+  if (value > 70) return "High";
+  return "Normal";
+};
+
 export async function getLogs({ sensorId, startDate, endDate, status }) {
   const { startUtc } = getWitaRange(startDate);
   const { endExclusiveUtc } = getWitaRange(endDate);
@@ -24,15 +32,11 @@ export async function getLogs({ sensorId, startDate, endDate, status }) {
     .order(config.timestampColumn, { ascending: true })
     .limit(10000);
 
-  if (status) {
-    query = query.eq(config.statusColumn, status);
-  }
-
   const { data, error } = await query;
   if (error) {
     throw error;
   }
-  return data;
+  return status ? data.filter((reading) => getMoistureStatus(reading.moisture) === status) : data;
 }
 
 export async function getRecentLogs(sensorId) {
@@ -67,7 +71,7 @@ export async function getSensorData(sensorId) {
   const [latestResponse, chartResponse, sensorResponse] = await Promise.all([
     supabase
       .from(config.logsTable)
-      .select("id, moisture, temperature, humidity, created_at, status")
+      .select("id, moisture, temperature, humidity, created_at")
       .eq("sensor_id", sensorId)
       .order(config.timestampColumn, { ascending: false })
       .limit(1)
@@ -126,14 +130,14 @@ export async function getSensorData(sensorId) {
       moisture,
       temperature,
       humidity,
-      status: latest.status,
+      status: getMoistureStatus(moisture),
       created_at: latest.created_at,
     },
     chart,
     moisture,
     temperature,
     humidity,
-    status: latest.status,
+    status: getMoistureStatus(moisture),
     sensorStatus: sensorResponse.data?.status || "Unknown",
     isOnline: minutesSinceLastReading <= 1,
     lastSeen: latest.created_at,

@@ -19,8 +19,8 @@ const AppLayout = () => {
 
   return (
   <div className="min-h-screen bg-white">
-    <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-200 bg-white transition-[width] duration-200 lg:flex lg:flex-col ${isSidebarOpen ? "w-60" : "w-0 overflow-hidden"}`}>
-      <div className="flex h-[73px] items-center gap-3 border-b border-slate-100 px-5">
+    <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-200 bg-white transition-[width] duration-200 max-lg:bottom-0 max-lg:top-auto max-lg:flex max-lg:h-16 max-lg:w-full max-lg:flex-row max-lg:border-r-0 max-lg:border-t max-lg:shadow-[0_-2px_12px_rgba(15,23,42,0.06)] lg:flex lg:flex-col ${isSidebarOpen ? "w-60" : "w-0 overflow-hidden"}`}>
+      <div className="flex h-[73px] items-center gap-3 border-b border-slate-100 px-5 max-lg:hidden">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1DAADF] text-white">
           <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
         </div>
@@ -30,9 +30,9 @@ const AppLayout = () => {
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-6" aria-label="Navigasi utama">
-        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Menu utama</p>
-        <div className="space-y-1">
+      <nav className="flex-1 px-3 py-6 max-lg:flex max-lg:items-center max-lg:justify-around max-lg:px-2 max-lg:py-2" aria-label="Navigasi utama">
+        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 max-lg:hidden">Menu utama</p>
+        <div className="space-y-1 max-lg:flex max-lg:w-full max-lg:justify-around max-lg:gap-1">
           {navigationItems.map(({ label, to, icon: Icon, end }) => (
             <NavLink
               key={label}
@@ -45,8 +45,8 @@ const AppLayout = () => {
           ))}
         </div>
 
-        <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Lainnya</p>
-        <div className="space-y-1">
+        <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 max-lg:hidden">Lainnya</p>
+        <div className="space-y-1 max-lg:hidden">
           {secondaryItems.map(({ label, icon: Icon }) => (
             <div key={label} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-400" aria-disabled="true">
               <Icon className="text-lg" aria-hidden="true" />
@@ -56,7 +56,7 @@ const AppLayout = () => {
         </div>
       </nav>
 
-      <div className="border-t border-slate-100 px-5 py-4">
+      <div className="border-t border-slate-100 px-5 py-4 max-lg:hidden">
         <p className="text-xs font-semibold text-[#1DAADF]">Smart Agriculture</p>
         <p className="mt-1 text-[11px] text-slate-400">v1.0.0</p>
       </div>
@@ -73,7 +73,7 @@ const AppLayout = () => {
       {isSidebarOpen ? <FiChevronLeft aria-hidden="true" /> : <FiChevronRight aria-hidden="true" />}
     </button>
 
-    <div className={`transition-[padding] duration-200 ${isSidebarOpen ? "lg:pl-60" : "lg:pl-0"}`}>
+    <div className={`pb-16 transition-[padding] duration-200 lg:pb-0 ${isSidebarOpen ? "lg:pl-60" : "lg:pl-0"}`}>
       <Outlet />
     </div>
   </div>

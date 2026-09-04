@@ -150,10 +150,10 @@ const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
         }
       }}
     >
-      <form onSubmit={handleDownload} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4 mb-6">
+      <form onSubmit={handleDownload} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
+        <div className="mb-6 flex items-start justify-between gap-3">
           <div>
-            <h2 id="download-data-title" className="text-2xl font-bold text-gray-900">Download Data</h2>
+            <h2 id="download-data-title" className="text-xl font-bold text-gray-900 sm:text-2xl">Download Data</h2>
             <p className="mt-1 text-sm text-gray-600">Pilih data sensor dan periode laporan yang ingin diunduh.</p>
           </div>
           <button type="button" onClick={onClose} disabled={isDownloading} className="text-2xl leading-none text-gray-500 hover:text-gray-800 disabled:cursor-not-allowed" aria-label="Tutup modal">&times;</button>

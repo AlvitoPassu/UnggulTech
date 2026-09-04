@@ -96,7 +96,7 @@ const SensorPage = () => {
   return (
     <div className="min-h-screen bg-white text-slate-800">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DAADF] text-white">
               <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
@@ -107,7 +107,7 @@ const SensorPage = () => {
             </div>
           </div>
 
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+          <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
             <div className="hidden items-center gap-2 text-right sm:flex">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p>
@@ -121,7 +121,7 @@ const SensorPage = () => {
                 id="sensor-page-selector"
                 value={selectedSensorId}
                 onChange={(event) => setSelectedSensorId(event.target.value)}
-                className="min-w-44 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa] sm:min-w-44"
               >
                 {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
               </select>
@@ -130,7 +130,7 @@ const SensorPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8">
+      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 sm:py-7">
         <div className="mb-6">
           <p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Detail Sensor</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1>
@@ -142,7 +142,7 @@ const SensorPage = () => {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e8f7fc] text-[#1DAADF]">
                 <FiActivity className="text-2xl" aria-hidden="true" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-lg font-bold text-slate-900">{selectedSensor ? getSensorDisplayName(selectedSensor) : "Sensor belum dipilih"}</h2>
                 <p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><FiMapPin aria-hidden="true" /> {sensorLocation}</p>
               </div>
@@ -191,7 +191,7 @@ const SensorPage = () => {
           <section className={`${panelClass} p-5 sm:p-6`}>
             <div className="flex items-center gap-2"><FiInfo className="text-lg text-[#1DAADF]" aria-hidden="true" /><h2 className="text-base font-bold text-slate-900">Informasi Sensor</h2></div>
             <dl className="mt-5 divide-y divide-slate-100 text-sm">
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Tipe Sensor</dt><dd className="text-right font-medium text-slate-800">Capacitive Soil Moisture Sensor V2.0</dd></div>
+              <div className="flex flex-wrap justify-between gap-2 py-3"><dt className="text-slate-500">Tipe Sensor</dt><dd className="text-right font-medium text-slate-800">Capacitive Soil Moisture Sensor V2.0</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Interval Pengiriman</dt><dd className="font-medium text-slate-800">1 menit</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Tegangan Operasional</dt><dd className="font-medium text-slate-800">3.3V - 5.5V DC</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Status Koneksi</dt><dd><StatusBadge isOnline={isOnline} /></dd></div>
