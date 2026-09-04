@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { FiActivity, FiBarChart2, FiBell, FiChevronLeft, FiChevronRight, FiFileText, FiSettings } from "react-icons/fi";
+import { FiActivity, FiBarChart2, FiChevronLeft, FiChevronRight, FiFileText } from "react-icons/fi";
 
 const navigationItems = [
   { label: "Dashboard", to: "/", icon: FiBarChart2, end: true },
   { label: "Sensor", to: "/sensor", icon: FiActivity },
   { label: "Data Historis", to: "/data-historis", icon: FiFileText },
-];
-
-const secondaryItems = [
-  { label: "Peringatan", icon: FiBell },
-  { label: "Laporan", icon: FiFileText },
-  { label: "Pengaturan", icon: FiSettings },
 ];
 
 const AppLayout = () => {
@@ -45,15 +39,6 @@ const AppLayout = () => {
           ))}
         </div>
 
-        <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 max-lg:hidden">Lainnya</p>
-        <div className="space-y-1 max-lg:hidden">
-          {secondaryItems.map(({ label, icon: Icon }) => (
-            <div key={label} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-400" aria-disabled="true">
-              <Icon className="text-lg" aria-hidden="true" />
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
       </nav>
 
       <div className="border-t border-slate-100 px-5 py-4 max-lg:hidden">
