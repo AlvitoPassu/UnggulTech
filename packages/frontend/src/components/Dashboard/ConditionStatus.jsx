@@ -15,7 +15,7 @@ const ConditionStatus = ({ sensorData }) => {
 
         <div className="mt-2 h-2 w-full rounded-full bg-slate-100">
           <div
-            className="h-2 rounded-full bg-green-600"
+            className="h-2 rounded-full bg-[#1DAADF]"
             style={{ width: `${Math.min(Math.max(moisture, 0), 100)}%` }}
           />
         </div>

@@ -4,13 +4,13 @@ const StatusBadge = ({ isOnline }) => (
   <span
   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
       isOnline
-        ? "bg-green-100 text-green-700"
+        ? "bg-[#d1f0fa] text-[#1DAADF]"
         : "bg-red-100 text-red-700"
     }`}
   >
     <span
       className={`h-1.5 w-1.5 rounded-full ${
-        isOnline ? "bg-green-500 animate-pulse" : "bg-red-500"
+        isOnline ? "bg-[#1DAADF] animate-pulse" : "bg-red-500"
       }`}
     />
     {isOnline ? "Aktif" : "Tidak Aktif"}
@@ -73,7 +73,7 @@ const SummaryCards = ({ sensorData }) => {
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-sm font-semibold text-slate-600">{item.title}</h3>
 
-                  <Icon className="text-2xl text-green-700" aria-hidden="true" />
+                  <Icon className="text-2xl text-[#1DAADF]" aria-hidden="true" />
             </div>
 
                 <div className="mt-4 flex min-h-10 items-center gap-3">

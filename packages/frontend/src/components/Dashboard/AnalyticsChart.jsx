@@ -16,7 +16,7 @@ const AnalyticsChart = ({ data }) => {
           <h3 className="text-base font-bold text-slate-900">Moisture Trend</h3>
           <p className="mt-1 text-xs text-slate-500">Perubahan kelembapan tanah</p>
         </div>
-        <span className="rounded-md bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">10 menit terakhir</span>
+        <span className="rounded-md bg-[#e8f7fc] px-2.5 py-1 text-xs font-medium text-[#1DAADF]">10 menit terakhir</span>
       </div>
 
       <ResponsiveContainer width="100%" height="82%">
@@ -28,9 +28,9 @@ const AnalyticsChart = ({ data }) => {
           <Line
             type="monotone"
             dataKey="moisture"
-            stroke="#248a45"
+            stroke="#1DAADF"
             strokeWidth={2.5}
-            dot={{ r: 2.5, fill: "#248a45", strokeWidth: 0 }}
+            dot={{ r: 2.5, fill: "#1DAADF", strokeWidth: 0 }}
             activeDot={{ r: 5, strokeWidth: 0 }}
           />
         </LineChart>

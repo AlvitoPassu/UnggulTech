@@ -39,13 +39,13 @@ const formatLastSeen = (date) => {
 };
 
 const StatusBadge = ({ isOnline }) => (
-  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isOnline ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-    <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-green-600" : "bg-red-500"}`} />
+  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isOnline ? "bg-[#e8f7fc] text-[#1DAADF]" : "bg-red-50 text-red-700"}`}>
+    <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-[#1DAADF]" : "bg-red-500"}`} />
     {isOnline ? "Aktif" : "Tidak Aktif"}
   </span>
 );
 
-const Metric = ({ icon: Icon, label, value, status, color = "text-green-700" }) => (
+const Metric = ({ icon: Icon, label, value, status, color = "text-[#1DAADF]" }) => (
   <div className="rounded-md border border-slate-200 p-4">
     <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
       <Icon className={`text-lg ${color}`} aria-hidden="true" />
@@ -94,12 +94,12 @@ const SensorPage = () => {
   const sensorLocation = selectedSensor?.location || "Lokasi belum tersedia";
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] text-slate-800">
+    <div className="min-h-screen bg-white text-slate-800">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-700 text-white">
-              <FiActivity className="text-xl" aria-hidden="true" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DAADF] text-white">
+              <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p>
@@ -121,7 +121,7 @@ const SensorPage = () => {
                 id="sensor-page-selector"
                 value={selectedSensorId}
                 onChange={(event) => setSelectedSensorId(event.target.value)}
-                className="min-w-44 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
+                className="min-w-44 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"
               >
                 {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
               </select>
@@ -132,14 +132,14 @@ const SensorPage = () => {
 
       <main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8">
         <div className="mb-6">
-          <p className="mb-1 text-sm font-medium text-green-700">Sensor / Detail Sensor</p>
+          <p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Detail Sensor</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1>
         </div>
 
         <section className={`${panelClass} p-5 sm:p-6`}>
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-700">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e8f7fc] text-[#1DAADF]">
                 <FiActivity className="text-2xl" aria-hidden="true" />
               </div>
               <div>
@@ -171,7 +171,7 @@ const SensorPage = () => {
           <section className={`${panelClass} p-5 sm:p-6 xl:col-span-2`}>
             <div className="mb-5 flex items-start justify-between gap-3">
               <div><h2 className="text-base font-bold text-slate-900">Grafik Soil Moisture</h2><p className="mt-1 text-xs text-slate-500">Data aktual dari pembacaan sensor</p></div>
-              <span className="rounded-md bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">10 data terbaru</span>
+              <span className="rounded-md bg-[#e8f7fc] px-2.5 py-1 text-xs font-medium text-[#1DAADF]">10 data terbaru</span>
             </div>
             {sensorData?.chart?.length ? (
               <div className="h-[290px] w-full">
@@ -181,7 +181,7 @@ const SensorPage = () => {
                     <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} />
                     <Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-                    <Line type="monotone" dataKey="moisture" name="Soil Moisture (%)" stroke="#248a45" strokeWidth={2.5} dot={{ r: 3, fill: "#248a45", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
+                    <Line type="monotone" dataKey="moisture" name="Soil Moisture (%)" stroke="#1DAADF" strokeWidth={2.5} dot={{ r: 3, fill: "#1DAADF", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -189,7 +189,7 @@ const SensorPage = () => {
           </section>
 
           <section className={`${panelClass} p-5 sm:p-6`}>
-            <div className="flex items-center gap-2"><FiInfo className="text-lg text-green-700" aria-hidden="true" /><h2 className="text-base font-bold text-slate-900">Informasi Sensor</h2></div>
+            <div className="flex items-center gap-2"><FiInfo className="text-lg text-[#1DAADF]" aria-hidden="true" /><h2 className="text-base font-bold text-slate-900">Informasi Sensor</h2></div>
             <dl className="mt-5 divide-y divide-slate-100 text-sm">
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Tipe Sensor</dt><dd className="text-right font-medium text-slate-800">Capacitive Soil Moisture Sensor V2.0</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Interval Pengiriman</dt><dd className="font-medium text-slate-800">1 menit</dd></div>
@@ -197,7 +197,7 @@ const SensorPage = () => {
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Status Koneksi</dt><dd><StatusBadge isOnline={isOnline} /></dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Terakhir Update</dt><dd className="font-medium text-slate-800">{formatLastSeen(sensorData?.lastSeen)}</dd></div>
             </dl>
-            <div className="mt-4 flex gap-2 rounded-md bg-green-50 p-3 text-xs leading-5 text-green-800"><FiInfo className="mt-0.5 shrink-0" aria-hidden="true" /> Status ditentukan dari pembacaan sensor terakhir.</div>
+            <div className="mt-4 flex gap-2 rounded-md bg-[#e8f7fc] p-3 text-xs leading-5 text-[#1686b3]"><FiInfo className="mt-0.5 shrink-0" aria-hidden="true" /> Status ditentukan dari pembacaan sensor terakhir.</div>
           </section>
         </div>
 

@@ -67,7 +67,7 @@ const WeatherCard = () => {
         </div>
         {location && (
           <span className="flex items-center gap-1 text-right text-xs text-slate-500">
-            <FaMapMarkerAlt className="shrink-0 text-green-600" aria-hidden="true" />
+            <FaMapMarkerAlt className="shrink-0 text-[#1DAADF]" aria-hidden="true" />
             {location.desa}, {location.kecamatan}
           </span>
         )}

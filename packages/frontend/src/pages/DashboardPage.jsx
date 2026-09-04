@@ -55,24 +55,24 @@ const DashboardPage = () => {
     : "Belum ada data";
 
   return (
-    <div className="min-h-screen bg-[#f4f7f3] text-slate-800">
+    <div className="min-h-screen bg-white text-slate-800">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-700 text-white"><FiActivity className="text-xl" aria-hidden="true" /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DAADF] text-white"><img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" /></div>
             <div className="min-w-0"><p className="truncate text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p><p className="mt-0.5 text-xs text-slate-500">Overview operasional nursery</p></div>
           </div>
           <div className="ml-auto flex items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-2 text-right">
               <div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p><p className="text-xs font-semibold text-slate-700">{isLoading ? "Memuat data..." : formattedLastUpdated}</p></div>
-              <button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-green-700" aria-label="Refresh data"><FiRefreshCw aria-hidden="true" /></button>
+              <button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-[#1DAADF]" aria-label="Refresh data"><FiRefreshCw aria-hidden="true" /></button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1440px] px-5 py-7 sm:px-8">
-        <div className="mb-6"><p className="mb-1 text-sm font-medium text-green-700">Overview kondisi nursery secara real-time</p><h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dashboard</h1></div>
+        <div className="mb-6"><p className="mb-1 text-sm font-medium text-[#1DAADF]">Overview kondisi nursery secara real-time</p><h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dashboard</h1></div>
         {error && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="font-semibold underline underline-offset-2">Refresh</button></div>}
         {isLoading && <p className="mb-4 text-sm text-slate-500">Memuat data nursery...</p>}
 

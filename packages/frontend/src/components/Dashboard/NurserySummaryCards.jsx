@@ -2,8 +2,8 @@ import { FiActivity, FiDroplet, FiGrid, FiWifi } from "react-icons/fi";
 
 const NurserySummaryCards = ({ summary }) => {
   const cards = [
-    { label: "Total Bedengan", value: summary?.totalBedengan, detail: "Nursery", icon: FiGrid, color: "text-green-700", bg: "bg-green-50" },
-    { label: "Sensor Terpasang", value: summary?.totalSensors, detail: `${summary?.totalSensors ?? "-"} sensor terdaftar`, icon: FiActivity, color: "text-emerald-700", bg: "bg-emerald-50" },
+    { label: "Total Bedengan", value: summary?.totalBedengan, detail: "Nursery", icon: FiGrid, color: "text-[#1DAADF]", bg: "bg-[#e8f7fc]" },
+    { label: "Sensor Terpasang", value: summary?.totalSensors, detail: `${summary?.totalSensors ?? "-"} sensor terdaftar`, icon: FiActivity, color: "text-[#1DAADF]", bg: "bg-[#e8f7fc]" },
     { label: "Sensor Aktif", value: summary?.activeSensors, detail: "Terhubung", icon: FiWifi, color: "text-sky-700", bg: "bg-sky-50" },
     { label: "Rata-rata Soil Moisture", value: summary?.averageMoisture == null ? "-" : `${Math.round(summary.averageMoisture)}%`, detail: "Seluruh sensor", icon: FiDroplet, color: "text-blue-700", bg: "bg-blue-50" },
   ];

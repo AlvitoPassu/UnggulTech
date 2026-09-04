@@ -1,7 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 const categories = [
-  { key: "normal", label: "Normal", description: "60% - 100%", color: "#2f9e50" },
+  { key: "normal", label: "Normal", description: "60% - 100%", color: "#1DAADF" },
   { key: "attention", label: "Perlu Perhatian", description: "30% - 59%", color: "#f59e0b" },
   { key: "dry", label: "Kering", description: "< 30%", color: "#dc3d3d" },
   { key: "offline", label: "Offline", description: "Tidak ada data", color: "#94a3b8" },

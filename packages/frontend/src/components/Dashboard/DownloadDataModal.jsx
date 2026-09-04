@@ -162,7 +162,7 @@ const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-medium text-gray-700 sm:col-span-2">
             Pilih Sensor / Bedengan
-            <select value={sensorId} onChange={(event) => setSensorId(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200">
+            <select value={sensorId} onChange={(event) => setSensorId(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]">
               <option value="">Pilih bedengan</option>
               {sensors.map((sensor) => (
                 <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>
@@ -172,41 +172,41 @@ const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
 
           <label className="block text-sm font-medium text-gray-700">
             Rentang Waktu
-            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200">
+            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]">
               {periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
 
-          {period === "daily" && <label className="block text-sm font-medium text-gray-700">Pilih Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200" /></label>}
-          {period === "weekly" && <label className="block text-sm font-medium text-gray-700">Pilih Minggu<input type="week" value={week} onChange={(event) => setWeek(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200" /></label>}
-          {period === "monthly" && <label className="block text-sm font-medium text-gray-700">Pilih Bulan<input type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200" /></label>}
+          {period === "daily" && <label className="block text-sm font-medium text-gray-700">Pilih Tanggal<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]" /></label>}
+          {period === "weekly" && <label className="block text-sm font-medium text-gray-700">Pilih Minggu<input type="week" value={week} onChange={(event) => setWeek(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]" /></label>}
+          {period === "monthly" && <label className="block text-sm font-medium text-gray-700">Pilih Bulan<input type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]" /></label>}
           {period === "custom" && <>
-            <label className="block text-sm font-medium text-gray-700">Tanggal Mulai<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200" /></label>
-            <label className="block text-sm font-medium text-gray-700">Tanggal Selesai<input type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200" /></label>
+            <label className="block text-sm font-medium text-gray-700">Tanggal Mulai<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]" /></label>
+            <label className="block text-sm font-medium text-gray-700">Tanggal Selesai<input type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]" /></label>
           </>}
 
           <label className="block text-sm font-medium text-gray-700">
             Filter Status
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200">
+            <select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]">
               {statusOptions.map((option) => <option key={option || "all"} value={option}>{option || "Semua Status"}</option>)}
             </select>
           </label>
 
           <label className="block text-sm font-medium text-gray-700">
             Format File
-            <select value={format} onChange={(event) => setFormat(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200">
+            <select value={format} onChange={(event) => setFormat(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]">
               {formatOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
         </div>
 
         {period === "custom" && startDate && endDate && startDate > endDate && <p className="mt-3 text-sm text-red-600">Tanggal selesai harus setelah tanggal mulai.</p>}
-        {dateRange && <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">Laporan akan mencakup data dari {dateRange.startDate} sampai {dateRange.endDate}.</p>}
-        {notification && <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${notification.type === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{notification.message}</p>}
+        {dateRange && <p className="mt-4 rounded-lg bg-[#e8f7fc] px-3 py-2 text-sm text-[#1686b3]">Laporan akan mencakup data dari {dateRange.startDate} sampai {dateRange.endDate}.</p>}
+        {notification && <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${notification.type === "success" ? "bg-[#e8f7fc] text-[#1686b3]" : "bg-red-50 text-red-700"}`}>{notification.message}</p>}
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={isDownloading} className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed">Batal</button>
-          <button type="submit" disabled={!isFormValid || isDownloading} className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300">
+          <button type="submit" disabled={!isFormValid || isDownloading} className="rounded-lg bg-[#1DAADF] px-4 py-2 font-medium text-white hover:bg-[#1686b3] disabled:cursor-not-allowed disabled:bg-gray-300">
             {isDownloading ? "Menyiapkan file..." : "Download Data"}
           </button>
         </div>
