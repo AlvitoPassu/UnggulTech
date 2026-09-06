@@ -1,4 +1,11 @@
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+
+dotenv.config({
+  path: fileURLToPath(new URL("../../.env", import.meta.url)),
+  override: true,
+});
 
 const requiredEnvironment = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 const missingEnvironment = requiredEnvironment.filter((key) => !process.env[key]);

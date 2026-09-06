@@ -1,4 +1,3 @@
-import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { config } from "./config/supabase.js";
@@ -7,6 +6,10 @@ import reportRoutes from "./routes/reportRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+
+if (!process.env.GEMINI_API_KEY) {
+  console.error("GEMINI_API_KEY is not configured.");
+}
 
 const app = express();
 
