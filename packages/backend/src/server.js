@@ -6,6 +6,7 @@ import sensorRoutes from "./routes/sensorRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/sensors", sensorRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/historical-readings", historicalRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // Global Error Handler
 app.use((error, _req, res, _next) => {

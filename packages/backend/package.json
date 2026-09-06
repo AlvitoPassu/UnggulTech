@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "@supabase/supabase-js": "^2.112.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

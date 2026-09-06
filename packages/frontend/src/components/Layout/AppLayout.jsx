@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { FiActivity, FiBarChart2, FiChevronLeft, FiChevronRight, FiFileText } from "react-icons/fi";
+import ChatbotAssistant from "../Chatbot/ChatbotAssistant";
 
 const navigationItems = [
   { label: "Dashboard", to: "/", icon: FiBarChart2, end: true },
@@ -60,6 +61,7 @@ const AppLayout = () => {
     <div className={`pb-16 transition-[padding] duration-200 lg:pb-0 ${isSidebarOpen ? "lg:pl-60" : "lg:pl-0"}`}>
       <Outlet />
     </div>
+    <ChatbotAssistant />
   </div>
   );
 };
