@@ -27,7 +27,7 @@ router.post("/download", async (req, res, next) => {
       return sendCsv(res, rows);
     }
     if (filters.format === "xlsx") {
-      return await sendXlsx(res, rows);
+      return await sendXlsx(res, rows, filters.startDate, filters.endDate);
     }
     return sendPdf(res, rows, filters.startDate, filters.endDate);
   } catch (error) {
