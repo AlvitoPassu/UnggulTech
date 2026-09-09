@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { FiActivity, FiBarChart2, FiChevronLeft, FiChevronRight, FiFileText } from "react-icons/fi";
+import { FiActivity, FiBarChart2, FiChevronLeft, FiChevronRight, FiCpu, FiFileText } from "react-icons/fi";
 import ChatbotAssistant from "../Chatbot/ChatbotAssistant";
 
 const navigationItems = [
   { label: "Dashboard", to: "/", icon: FiBarChart2, end: true },
   { label: "Sensor", to: "/sensor", icon: FiActivity },
   { label: "Data Historis", to: "/data-historis", icon: FiFileText },
+  { label: "Rekomendasi AI", to: "/rekomendasi-ai", icon: FiCpu },
 ];
 
 const AppLayout = () => {

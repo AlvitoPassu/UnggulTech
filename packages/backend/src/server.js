@@ -6,6 +6,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
+import rainfallRoutes from "./routes/rainfallRoutes.js";
 
 if (!process.env.GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY is not configured.");
@@ -25,6 +26,7 @@ app.use("/api/sensors", sensorRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/historical-readings", historicalRoutes);
+app.use("/api/rainfall", rainfallRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 
 // Global Error Handler

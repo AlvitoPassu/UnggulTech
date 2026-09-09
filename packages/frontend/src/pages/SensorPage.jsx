@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -25,6 +25,7 @@ import {
   getSensors,
   getSensorDisplayName,
 } from "../api/sensorApi";
+import { createRainfallReading, getRainfallHistory } from "../api/rainfallApi";
 
 const panelClass = "rounded-lg border border-slate-200 bg-white shadow-sm";
 
@@ -36,6 +37,25 @@ const formatLastSeen = (date) => {
   if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
 
   return `${Math.floor(diffMinutes / 60)} jam lalu`;
+};
+
+const getLocalDate = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+const getLocalTime = () => {
+  const date = new Date();
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+};
+
+const formatMeasurementDate = (value) => {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Makassar",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 };
 
 const StatusBadge = ({ isOnline }) => (
@@ -61,12 +81,38 @@ const SensorPage = () => {
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
+  const [rainfallHistory, setRainfallHistory] = useState([]);
+  const [rainfallHistoryLoading, setRainfallHistoryLoading] = useState(true);
+  const [rainfallHistoryError, setRainfallHistoryError] = useState("");
+  const [rainfallForm, setRainfallForm] = useState({
+    nursery: "",
+    bedengan: "",
+    rainfall_value: "",
+    unit: "ml",
+    measured_date: getLocalDate(),
+    measured_time: getLocalTime(),
+    notes: "",
+  });
+  const [rainfallSaving, setRainfallSaving] = useState(false);
+  const [rainfallMessage, setRainfallMessage] = useState({ type: "", text: "" });
+
+  const nurseryOptions = useMemo(() => [...new Set(sensors.map((sensor) => sensor.location).filter(Boolean))], [sensors]);
+  const bedenganOptions = useMemo(
+    () => sensors.filter((sensor) => !rainfallForm.nursery || sensor.location === rainfallForm.nursery)
+      .map((sensor) => sensor.bedengan)
+      .filter((value, index, values) => value !== null && value !== undefined && value !== "" && values.indexOf(value) === index),
+    [rainfallForm.nursery, sensors]
+  );
 
   useEffect(() => {
     const fetchSensors = () => {
       getSensors().then((data) => {
         setSensors(data);
         setSelectedSensorId((previousId) => previousId || data[0]?.id || "");
+        setRainfallForm((current) => ({
+          ...current,
+          nursery: current.nursery || data.find((sensor) => sensor.location)?.location || "",
+        }));
       });
     };
 
@@ -88,10 +134,53 @@ const SensorPage = () => {
     return () => clearInterval(interval);
   }, [selectedSensorId]);
 
+  useEffect(() => {
+    getRainfallHistory()
+      .then(setRainfallHistory)
+      .catch(() => setRainfallHistoryError("Gagal memuat data curah hujan."))
+      .finally(() => setRainfallHistoryLoading(false));
+  }, []);
+
   const selectedSensor = sensors.find((sensor) => sensor.id === selectedSensorId);
   const isOnline = sensorData?.isOnline ?? false;
   const moisture = sensorData?.moisture ?? "-";
   const sensorLocation = selectedSensor?.location || "Lokasi belum tersedia";
+
+  const handleRainfallSubmit = async (event) => {
+    event.preventDefault();
+    setRainfallMessage({ type: "", text: "" });
+
+    const rainfallValue = Number(rainfallForm.rainfall_value);
+    if (!Number.isFinite(rainfallValue) || rainfallValue < 0) {
+      setRainfallMessage({ type: "error", text: "Curah hujan harus berupa angka nol atau lebih." });
+      return;
+    }
+
+    const measuredAt = new Date(`${rainfallForm.measured_date}T${rainfallForm.measured_time}`);
+    if (Number.isNaN(measuredAt.getTime())) {
+      setRainfallMessage({ type: "error", text: "Tanggal dan waktu pengukuran tidak valid." });
+      return;
+    }
+
+    setRainfallSaving(true);
+    try {
+      const result = await createRainfallReading({
+        rainfall_value: rainfallValue,
+        unit: "ml",
+        measured_at: measuredAt.toISOString(),
+        nursery: rainfallForm.nursery || null,
+        bedengan: rainfallForm.bedengan || null,
+        notes: rainfallForm.notes,
+      });
+      setRainfallHistory((current) => [result.reading, ...current].slice(0, 50));
+      setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
+      setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
+    } catch (error) {
+      setRainfallMessage({ type: "error", text: error.response?.data?.message || "Gagal menyimpan data curah hujan." });
+    } finally {
+      setRainfallSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
@@ -135,6 +224,28 @@ const SensorPage = () => {
           <p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Detail Sensor</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1>
         </div>
+
+        <section className={`${panelClass} mb-6 p-5 sm:p-6`}>
+          <div className="mb-5 flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><FiDroplet className="text-lg" aria-hidden="true" /></div>
+            <div><h2 className="text-base font-bold text-slate-900">Input Curah Hujan</h2><p className="mt-1 text-xs text-slate-500">Masukkan hasil pembacaan aktual tabung ombrometer.</p></div>
+          </div>
+          <form onSubmit={handleRainfallSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label className="text-sm font-medium text-slate-700">Nursery<select value={rainfallForm.nursery} onChange={(event) => setRainfallForm((current) => ({ ...current, nursery: event.target.value, bedengan: "" }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua nursery</option>{nurseryOptions.map((nursery) => <option key={nursery} value={nursery}>{nursery}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Bedengan<select value={rainfallForm.bedengan} onChange={(event) => setRainfallForm((current) => ({ ...current, bedengan: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua bedengan</option>{bedenganOptions.map((bedengan) => <option key={bedengan} value={bedengan}>Bedengan {bedengan}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Curah Hujan<input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">Satuan: ml</span></label>
+            <label className="text-sm font-medium text-slate-700">Tanggal Pengukuran<input required type="date" value={rainfallForm.measured_date} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_date: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
+            <label className="text-sm font-medium text-slate-700">Waktu Pengukuran<input required type="time" value={rainfallForm.measured_time} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_time: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
+            <label className="text-sm font-medium text-slate-700 md:col-span-2">Catatan opsional<textarea value={rainfallForm.notes} onChange={(event) => setRainfallForm((current) => ({ ...current, notes: event.target.value }))} rows="2" className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
+            <div className="flex items-end"><button type="submit" disabled={rainfallSaving} className="w-full rounded-md bg-[#1DAADF] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1686b3] disabled:cursor-not-allowed disabled:opacity-60">{rainfallSaving ? "Menyimpan..." : "Simpan Pengukuran"}</button></div>
+          </form>
+          {rainfallMessage.text && <p className={`mt-4 rounded-md px-3 py-2 text-sm ${rainfallMessage.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{rainfallMessage.text}</p>}
+        </section>
+
+        <section className={`${panelClass} mb-6 overflow-hidden`}>
+          <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Riwayat Curah Hujan</h2><p className="mt-1 text-xs text-slate-500">Pengukuran aktual dari tabung ombrometer</p></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Tanggal &amp; Waktu</th><th className="px-5 py-3">Nursery</th><th className="px-5 py-3">Bedengan</th><th className="px-5 py-3">Curah Hujan</th><th className="px-5 py-3">Sumber</th></tr></thead><tbody>{rainfallHistoryLoading ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Memuat data curah hujan...</td></tr> : rainfallHistoryError ? <tr><td colSpan="5" className="p-6 text-center text-red-600">{rainfallHistoryError}</td></tr> : rainfallHistory.length === 0 ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Belum ada pengukuran ombrometer.</td></tr> : rainfallHistory.map((reading) => <tr key={reading.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{formatMeasurementDate(reading.measured_at)}</td><td className="border-t border-slate-100 px-5 py-3">{reading.nursery || "-"}</td><td className="border-t border-slate-100 px-5 py-3">{reading.bedengan ? `Bedengan ${reading.bedengan}` : "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-semibold text-slate-800">{reading.rainfall_value} {reading.unit}</td><td className="border-t border-slate-100 px-5 py-3">{reading.source ? `${reading.source.charAt(0).toUpperCase()}${reading.source.slice(1)}` : "Ombrometer"}</td></tr>)}</tbody></table></div>
+        </section>
 
         <section className={`${panelClass} p-5 sm:p-6`}>
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">

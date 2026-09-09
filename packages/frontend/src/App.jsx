@@ -4,6 +4,7 @@ import DashboardPage from "./pages/DashboardPage";
 import SensorPage from "./pages/SensorPage";
 import AppLayout from "./components/Layout/AppLayout";
 import HistoricalDataPage from "./pages/HistoricalDataPage";
+import RecommendationAIPage from "./pages/RecommendationAIPage";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/sensor" element={<SensorPage />} />
           <Route path="/data-historis" element={<HistoricalDataPage />} />
+          <Route path="/rekomendasi-ai" element={<RecommendationAIPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
