@@ -82,6 +82,7 @@ export const getSensorData = async (sensorId) => {
 
   return {
     ...data,
+    soilPh: data.soil_ph === null || data.soil_ph === undefined ? null : Number(data.soil_ph),
     humidityStatus: getHumidityStatus(humidityValue),
     status: data.status || (data.moisture === null || data.moisture === undefined ? "Tidak tersedia" : getMoistureStatus(Number(data.moisture))),
   };

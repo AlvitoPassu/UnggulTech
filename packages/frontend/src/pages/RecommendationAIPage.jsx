@@ -353,7 +353,8 @@ const RecommendationAIPage = () => {
 
   const moistureValue = Number(selectedSensorData?.moisture ?? null);
   const moistureMeta = moistureStatus(moistureValue);
-  const phValue = null;
+  const phRaw = selectedSensorData?.soilPh ?? selectedSensorData?.soil_ph ?? null;
+  const phValue = phRaw === null || phRaw === undefined || phRaw === "" ? null : Number(phRaw);
   const phMeta = phStatus(phValue);
   const rainfallRaw = rainfall?.rainfall_value ?? rainfall?.rainfall_mm ?? rainfall?.value ?? rainfall?.amount ?? null;
   const rainfallValue = rainfallRaw === null || rainfallRaw === undefined || rainfallRaw === "" ? null : Number(rainfallRaw);
@@ -370,6 +371,13 @@ const RecommendationAIPage = () => {
         value: Number(entry.averageMoisture ?? entry.moisture ?? entry.value ?? 0),
       })),
     [trend]
+  );
+
+  const phTrend = useMemo(
+    () => (selectedSensorData?.chart || [])
+      .filter((entry) => entry.soil_ph !== null && entry.soil_ph !== undefined && Number.isFinite(Number(entry.soil_ph)))
+      .map((entry) => ({ ...entry, value: Number(entry.soil_ph) })),
+    [selectedSensorData]
   );
 
   useEffect(() => {
@@ -482,9 +490,10 @@ const RecommendationAIPage = () => {
               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${toneClasses[phMeta.tone]}`}>{phMeta.label}</span>
             </div>
             <p className="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">pH Tanah</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{phValue === null ? "-" : phValue.toFixed(1)}</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{phValue === null || Number.isNaN(phValue) ? "-" : phValue.toFixed(2)}</p>
             <p className="mt-3 text-[11px] text-slate-500">Kisaran target: 5.0 – 6.5</p>
             <p className="mt-1 text-[11px] text-slate-500">Optimal: 5.5 – 6.0</p>
+            <p className="mt-1 text-[11px] text-slate-500">{phValue === null || Number.isNaN(phValue) ? "Data pH belum tersedia." : "Parameter pH tanah aktual"}</p>
             <div className="mt-3 h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[5.2, 5.6, 6.1, 5.8, 5.9, 6.3, 5.7].map((point, index) => (
@@ -505,7 +514,6 @@ const RecommendationAIPage = () => {
             <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} ml` : "-"}</p>
             <p className="mt-3 text-[11px] text-slate-500">Threshold SOP: 10 ml</p>
             <p className="mt-1 text-[11px] text-slate-500">Status: {rainfallMeta.label}</p>
-            <p className="mt-1 text-[11px] text-slate-500">Sumber: {rainfall?.source ? `${rainfall.source.charAt(0).toUpperCase()}${rainfall.source.slice(1)}` : (rainfallValue === null ? "-" : "Ombrometer")}</p>
             {rainfallLoading && <p className="mt-1 text-[11px] text-slate-500">Memuat data curah hujan...</p>}
             {!rainfallLoading && rainfallError && <p className="mt-1 text-[11px] text-red-600">{rainfallError}</p>}
             {!rainfallLoading && !rainfallError && rainfallValue === null && <p className="mt-1 text-[11px] text-slate-500">Belum ada pengukuran ombrometer.</p>}
@@ -642,7 +650,7 @@ const RecommendationAIPage = () => {
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Data yang dianalisis</p>
                 <ul className="space-y-2">
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Kelembaban Tanah</span><strong>{moistureValue === null || Number.isNaN(moistureValue) ? "-" : `${Math.round(moistureValue)}%`}</strong></li>
-                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>pH Tanah</span><strong>{phValue === null ? "Data belum tersedia" : phValue.toFixed(1)}</strong></li>
+                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>pH Tanah</span><strong>{phValue === null || Number.isNaN(phValue) ? "Data belum tersedia" : phValue.toFixed(2)}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Curah Hujan</span><strong>{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} ml` : "Data belum tersedia"}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Probabilitas Hujan</span><strong>{nextForecast?.humidity ? `${nextForecast.humidity}%` : "Data tidak tersedia"}</strong></li>
                 </ul>
@@ -704,9 +712,9 @@ const RecommendationAIPage = () => {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="pH Tanah" description="Trend pH tanah" data={[]} emptyText="Data pH tanah belum tersedia pada struktur database yang saat ini aktif.">
+            <ChartCard title="pH Tanah" description="Trend pH tanah aktual" data={phTrend} color="#10b981" emptyText="Data pH belum tersedia.">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={[]} margin={{ top: 10, right: 8, left: -18, bottom: 4 }}>
+                <LineChart data={phTrend} margin={{ top: 10, right: 8, left: -18, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis domain={[4.5, 7]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />

@@ -44,6 +44,10 @@ router.post("/", async (req, res, next) => {
     }
 
     const results = await insertSensorReadings(body);
+    const rejected = results.filter((result) => result.success === false);
+    if (rejected.length > 0) {
+      return res.status(400).json({ message: "Data sensor tidak valid.", results });
+    }
     return res.status(201).json({ message: "Data sensor berhasil disimpan.", results });
   } catch (error) {
     next(error);
@@ -66,6 +70,7 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
       id: log.id,
       time: formatWitaTimestamp(log[config.timestampColumn]),
       moisture: log.moisture ?? log.soil_moisture ?? null,
+      soil_ph: log.soil_ph ?? null,
       temperature: log.temperature ?? null,
       action: getMoistureStatus(log.moisture),
     }));

@@ -55,7 +55,7 @@ export async function getHistoricalReadings(filters) {
 
   let query = supabase
     .from(config.logsTable)
-    .select("id, sensor_id, moisture, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)", { count: "exact" });
+    .select("id, sensor_id, moisture, soil_ph, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)", { count: "exact" });
   query = applyReadingFilters(query, filters, sensorIds);
   query = query.order(filters.sort.column, { ascending: filters.sort.ascending });
 

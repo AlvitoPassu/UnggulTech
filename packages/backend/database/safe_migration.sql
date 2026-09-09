@@ -172,6 +172,7 @@ execute function public.set_updated_at();
 -- =========================================================
 
 alter table public.sensor_readings
+  add column if not exists soil_ph numeric(5,2),
   add column if not exists temperature numeric,
   add column if not exists humidity numeric,
   add column if not exists created_at timestamptz,
@@ -374,6 +375,7 @@ select
   sr.id,
   sr.sensor_id,
   sr.moisture,
+  sr.soil_ph,
   sr.temperature,
   sr.humidity,
   case

@@ -20,6 +20,17 @@ export const getMoistureStatus = (moisture) => {
   return "Normal";
 };
 
+export const validateSoilPh = (value, isPresent = true) => {
+  if (!isPresent || value === null) return { valid: true, value: null };
+  if (value === "") return { valid: false, value: null };
+
+  const numericValue = Number(value);
+  return {
+    valid: Number.isFinite(numericValue) && numericValue >= 0 && numericValue <= 14,
+    value: Number.isFinite(numericValue) ? numericValue : null,
+  };
+};
+
 export async function getLogs({ sensorId, startDate, endDate, status }) {
   const { startUtc } = getWitaRange(startDate);
   const { endExclusiveUtc } = getWitaRange(endDate);
@@ -71,14 +82,14 @@ export async function getSensorData(sensorId) {
   const [latestResponse, chartResponse, sensorResponse] = await Promise.all([
     supabase
       .from(config.logsTable)
-      .select("id, moisture, temperature, humidity, created_at")
+      .select("id, moisture, soil_ph, temperature, humidity, created_at")
       .eq("sensor_id", sensorId)
       .order(config.timestampColumn, { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
       .from(config.logsTable)
-      .select("id, moisture, created_at")
+        .select("id, moisture, soil_ph, created_at")
       .eq("sensor_id", sensorId)
       .order(config.timestampColumn, { ascending: false })
       .limit(config.recentLogsLimit),
@@ -105,6 +116,7 @@ export async function getSensorData(sensorId) {
   const chart = (chartResponse.data ?? []).reverse().map((reading) => ({
     time: formatWitaTimestamp(reading.created_at),
     moisture: reading.moisture === null ? null : Number(reading.moisture),
+    soil_ph: reading.soil_ph === null ? null : Number(reading.soil_ph),
     created_at: reading.created_at,
   }));
 
@@ -121,6 +133,7 @@ export async function getSensorData(sensorId) {
   const lastSeenDate = new Date(latest.created_at);
   const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
   const moisture = latest.moisture === null ? null : Number(latest.moisture);
+  const soilPh = latest.soil_ph === null || latest.soil_ph === undefined ? null : Number(latest.soil_ph);
   const temperature = latest.temperature === null ? null : Number(latest.temperature);
   const humidity = latest.humidity === null ? null : Number(latest.humidity);
 
@@ -128,6 +141,7 @@ export async function getSensorData(sensorId) {
     sensor: sensorResponse.data,
     latest: {
       moisture,
+      soil_ph: soilPh,
       temperature,
       humidity,
       status: getMoistureStatus(moisture),
@@ -135,6 +149,7 @@ export async function getSensorData(sensorId) {
     },
     chart,
     moisture,
+    soil_ph: soilPh,
     temperature,
     humidity,
     status: getMoistureStatus(moisture),
@@ -154,7 +169,7 @@ const getMoistureCategory = (moisture) => {
 const getLatestReadings = async () => {
   const { data, error } = await supabase
     .from(config.logsTable)
-    .select("sensor_id, moisture, created_at")
+    .select("sensor_id, moisture, soil_ph, created_at")
     .order(config.timestampColumn, { ascending: false })
     .limit(10000);
 
@@ -181,10 +196,12 @@ export async function getNurseryOverview() {
     const lastSeen = latest?.created_at || null;
     const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 1);
     const moisture = latest?.moisture === null || latest?.moisture === undefined ? null : Number(latest.moisture);
+    const soilPh = latest?.soil_ph === null || latest?.soil_ph === undefined ? null : Number(latest.soil_ph);
 
     return {
       ...sensor,
       moisture,
+      soil_ph: soilPh,
       lastSeen,
       isOnline,
       category: isOnline ? getMoistureCategory(moisture) : "offline",
@@ -206,6 +223,9 @@ export async function getNurseryOverview() {
       offlineSensors: sensorRows.filter((sensor) => sensor.category === "offline").length,
       nonactiveSensors: sensorRows.filter((sensor) => sensor.status !== "Active").length,
       averageMoisture: readings.length ? readings.reduce((total, sensor) => total + sensor.moisture, 0) / readings.length : null,
+      averageSoilPh: sensorRows.filter((sensor) => sensor.soil_ph !== null).length
+        ? sensorRows.filter((sensor) => sensor.soil_ph !== null).reduce((total, sensor) => total + sensor.soil_ph, 0) / sensorRows.filter((sensor) => sensor.soil_ph !== null).length
+        : null,
       conditions: categoryCounts,
       lastUpdated: latestTimestamps.length ? latestTimestamps.sort().at(-1) : null,
     },
@@ -277,6 +297,14 @@ export async function insertSensorReadings(payload) {
     }
 
     const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
+    const hasSoilPh = Object.prototype.hasOwnProperty.call(sensorData, "soil_ph") || Object.prototype.hasOwnProperty.call(sensorData, "ph");
+    const soilPhRaw = sensorData.soil_ph ?? sensorData.ph ?? null;
+    const soilPhValidation = validateSoilPh(soilPhRaw, hasSoilPh);
+    const soilPh = soilPhValidation.value;
+
+    if (!soilPhValidation.valid) {
+      return { key, sensorId, success: false, error: "soil_ph harus berupa angka dalam rentang 0-14." };
+    }
 
     // Ambil data DHT11 dari payload (berlaku untuk semua sensor dalam satu pengiriman)
     const dht11 = payload.dht11;
@@ -303,6 +331,7 @@ export async function insertSensorReadings(payload) {
     const record = {
       sensor_id: sensorId,
       moisture: Number.isFinite(moisture) ? moisture : null,
+      soil_ph: soilPh,
       temperature,
       humidity,
     };
