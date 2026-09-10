@@ -463,7 +463,7 @@ const RecommendationAIPage = () => {
         )}
 
         <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#e8f7fc] text-[#1DAADF]">
                 <FiDroplet className="text-lg" aria-hidden="true" />
@@ -473,7 +473,7 @@ const RecommendationAIPage = () => {
             <p className="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">Kelembaban Tanah</p>
             <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{moistureValue === null || Number.isNaN(moistureValue) ? "-" : `${Math.round(moistureValue)}%`}</p>
             <p className="mt-3 text-[11px] text-slate-500">Range ideal: 40% – 70%</p>
-            <div className="mt-3 h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
+            <div className="mt-auto h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[35, 42, 48, 62, 51, 58, 44].map((point, index) => (
                   <span key={index} className="block flex-1 rounded-md bg-[#1DAADF]/70" style={{ height: `${point}%` }} />
@@ -482,7 +482,7 @@ const RecommendationAIPage = () => {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
                 <FiActivity className="text-lg" aria-hidden="true" />
@@ -494,7 +494,7 @@ const RecommendationAIPage = () => {
             <p className="mt-3 text-[11px] text-slate-500">Kisaran target: 5.0 – 6.5</p>
             <p className="mt-1 text-[11px] text-slate-500">Optimal: 5.5 – 6.0</p>
             <p className="mt-1 text-[11px] text-slate-500">{phValue === null || Number.isNaN(phValue) ? "Data pH belum tersedia." : "Parameter pH tanah aktual"}</p>
-            <div className="mt-3 h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
+            <div className="mt-auto h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[5.2, 5.6, 6.1, 5.8, 5.9, 6.3, 5.7].map((point, index) => (
                   <span key={index} className="block flex-1 rounded-md bg-emerald-400" style={{ height: `${((point - 4.8) / 2.2) * 100}%` }} />
@@ -503,7 +503,7 @@ const RecommendationAIPage = () => {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                 <FiCloudRain className="text-lg" aria-hidden="true" />
@@ -518,7 +518,7 @@ const RecommendationAIPage = () => {
             {!rainfallLoading && rainfallError && <p className="mt-1 text-[11px] text-red-600">{rainfallError}</p>}
             {!rainfallLoading && !rainfallError && rainfallValue === null && <p className="mt-1 text-[11px] text-slate-500">Belum ada pengukuran ombrometer.</p>}
             <p className="mt-1 text-[11px] text-slate-500">Sumber: {rainfall?.source || (rainfallValue === null ? "-" : "Ombrometer")}</p>
-            <div className="mt-3 h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
+            <div className="mt-auto h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[5, 8, 12, 9, 14, 10, 11].map((point, index) => (
                   <span key={index} className="block flex-1 rounded-md bg-sky-400" style={{ height: `${Math.min(100, point * 7)}%` }} />
