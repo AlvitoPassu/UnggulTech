@@ -280,7 +280,7 @@ const SensorPage = () => {
         </section>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-3">
-          <section className={`${panelClass} p-5 sm:p-6 xl:col-span-2`}>
+          <section className={`${panelClass} p-5 sm:p-6 xl:col-span-3`}>
             <div className="mb-5 flex items-start justify-between gap-3">
               <div><h2 className="text-base font-bold text-slate-900">Grafik Soil Moisture</h2><p className="mt-1 text-xs text-slate-500">Data aktual dari pembacaan sensor</p></div>
               <span className="rounded-md bg-[#e8f7fc] px-2.5 py-1 text-xs font-medium text-[#1DAADF]">10 data terbaru</span>
