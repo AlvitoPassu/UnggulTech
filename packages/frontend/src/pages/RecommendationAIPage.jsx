@@ -34,7 +34,12 @@ const STORAGE_KEY = "unggul-ai-recommendation-history";
 const getStoredHistory = () => {
   try {
     const storedHistory = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(storedHistory) ? storedHistory : [];
+    return Array.isArray(storedHistory)
+      ? storedHistory.map((item, index) => ({
+        ...item,
+        id: item.id || `${item.timestamp || "history"}-${index}`,
+      }))
+      : [];
   } catch {
     return [];
   }
@@ -407,7 +412,7 @@ const RecommendationAIPage = () => {
   const quickActions = [
     { label: "Lihat Detail Sensor", action: () => navigate("/sensor") },
     { label: "Lihat Prakiraan Cuaca", action: () => navigate("/dashboard") },
-    { label: "Lihat Riwayat Rekomendasi", action: () => setDetailOpen((current) => (current ? null : history[0]?.id || null)) },
+    { label: "Lihat Riwayat Rekomendasi", action: () => setDetailOpen((current) => (current ? null : history[0] || null)) },
     { label: "Atur Parameter", action: () => navigate("/sensor") },
   ];
 
@@ -777,7 +782,7 @@ const RecommendationAIPage = () => {
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <button type="button" className="font-semibold text-[#1DAADF]" onClick={() => setDetailOpen((current) => (current === item.id ? null : item.id))}>Lihat</button>
+                        <button type="button" className="font-semibold text-[#1DAADF]" onClick={() => setDetailOpen((current) => (current?.id === item.id ? null : item))}>Lihat</button>
                       </td>
                     </tr>
                   ))
@@ -786,12 +791,12 @@ const RecommendationAIPage = () => {
             </table>
           </div>
 
-          {detailOpen && history.find((item) => item.id === detailOpen) && (
+          {detailOpen && (
             <div className="border-t border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-slate-900">Detail keputusan</p>
-                  <p className="mt-1 text-xs text-slate-500">Dibuat pada {formatWita(history.find((item) => item.id === detailOpen)?.timestamp, { dateStyle: "medium", timeStyle: "short" })}</p>
+                  <p className="mt-1 text-xs text-slate-500">Dibuat pada {formatWita(detailOpen.timestamp, { dateStyle: "medium", timeStyle: "short" })}</p>
                 </div>
                 <button type="button" className="text-sm font-medium text-slate-500 hover:text-slate-700" onClick={() => setDetailOpen(null)}>Tutup</button>
               </div>
@@ -800,9 +805,9 @@ const RecommendationAIPage = () => {
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Data saat keputusan dibuat</p>
                   <ul className="mt-2 space-y-2 text-sm text-slate-700">
-                    <li>Kelembaban tanah: {history.find((item) => item.id === detailOpen)?.moisture == null ? "Data belum tersedia" : `${Math.round(Number(history.find((item) => item.id === detailOpen)?.moisture))}%`}</li>
-                    <li>pH tanah: {history.find((item) => item.id === detailOpen)?.ph == null ? "Data belum tersedia" : Number(history.find((item) => item.id === detailOpen)?.ph).toFixed(1)}</li>
-                    <li>Curah hujan: {history.find((item) => item.id === detailOpen)?.rainfall == null ? "Data belum tersedia" : `${Number(history.find((item) => item.id === detailOpen)?.rainfall).toFixed(1)} ml`}</li>
+                    <li>Kelembaban tanah: {detailOpen.moisture == null ? "Data belum tersedia" : `${Math.round(Number(detailOpen.moisture))}%`}</li>
+                    <li>pH tanah: {detailOpen.ph == null ? "Data belum tersedia" : Number(detailOpen.ph).toFixed(1)}</li>
+                    <li>Curah hujan: {detailOpen.rainfall == null ? "Data belum tersedia" : `${Number(detailOpen.rainfall).toFixed(1)} ml`}</li>
                   </ul>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
@@ -817,8 +822,8 @@ const RecommendationAIPage = () => {
 
               <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Hasil keputusan</p>
-                <p className="mt-2 text-base font-bold text-slate-900">{history.find((item) => item.id === detailOpen)?.recommendation}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{history.find((item) => item.id === detailOpen)?.detail}</p>
+                <p className="mt-2 text-base font-bold text-slate-900">{detailOpen.recommendation}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{detailOpen.detail}</p>
               </div>
             </div>
           )}
