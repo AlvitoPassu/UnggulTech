@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -197,10 +197,11 @@ const ChartCard = ({ title, description, data, color, children, emptyText }) => 
 
 const RecommendationAIPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [sensors, setSensors] = useState([]);
   const [selectedSensorId, setSelectedSensorId] = useState("");
-  const [selectedNursery, setSelectedNursery] = useState("all");
-  const [selectedBedengan, setSelectedBedengan] = useState("all");
+  const [selectedNursery, setSelectedNursery] = useState(() => searchParams.get("nursery") || "all");
+  const [selectedBedengan, setSelectedBedengan] = useState(() => searchParams.get("bedengan") || "all");
   const [selectedPeriod, setSelectedPeriod] = useState("7d");
   const [selectedSensorData, setSelectedSensorData] = useState(null);
   const [forecast, setForecast] = useState([]);
@@ -227,6 +228,17 @@ const RecommendationAIPage = () => {
   const [rainfallMessage, setRainfallMessage] = useState({ type: "", text: "" });
 
   useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (selectedNursery === "all") next.delete("nursery");
+      else next.set("nursery", selectedNursery);
+      if (selectedBedengan === "all") next.delete("bedengan");
+      else next.set("bedengan", selectedBedengan);
+      return next;
+    }, { replace: true });
+  }, [selectedBedengan, selectedNursery, setSearchParams]);
+
+  useEffect(() => {
     let isCurrent = true;
 
     const fetchData = async () => {
@@ -243,16 +255,14 @@ const RecommendationAIPage = () => {
 
         setSensors(sensorList);
 
-        const nurseries = [...new Set(sensorList.map((sensor) => sensor.location).filter(Boolean))];
-        const possibleNursery = selectedNursery === "all" ? (nurseries[0] ?? "") : selectedNursery;
+        const sensorNursery = selectedNursery === "all" ? "" : selectedNursery;
 
         const filteredByNursery = sensorList.filter((sensor) => {
-          if (!possibleNursery) return true;
-          return sensor.location === possibleNursery;
+          if (!sensorNursery) return true;
+          return sensor.location === sensorNursery;
         });
 
-        const bedenganList = [...new Set(filteredByNursery.map((sensor) => sensor.bedengan).filter((value) => value !== null && value !== undefined && value !== ""))].sort((a, b) => Number(a) - Number(b));
-        const nextBedengan = selectedBedengan === "all" ? (bedenganList[0] ?? "") : selectedBedengan;
+        const nextBedengan = selectedBedengan === "all" ? "" : selectedBedengan;
 
         const resolvedSensor = filteredByNursery.find((sensor) => String(sensor.bedengan) === String(nextBedengan)) || filteredByNursery[0] || sensorList[0];
         const nextSensorId = resolvedSensor?.id ? String(resolvedSensor.id) : "";
@@ -262,8 +272,8 @@ const RecommendationAIPage = () => {
           if (isCurrent) {
             setSelectedSensorData(sensorValue);
             setSelectedSensorId(nextSensorId);
-            setSelectedNursery(possibleNursery || "all");
-            setSelectedBedengan(nextBedengan || "all");
+            setSelectedNursery(selectedNursery);
+            setSelectedBedengan(selectedBedengan);
           }
         } else {
           if (isCurrent) {
@@ -385,7 +395,7 @@ const RecommendationAIPage = () => {
   const rainfallValue = rainfallRaw === null || rainfallRaw === undefined || rainfallRaw === "" ? null : Number(rainfallRaw);
   const rainfallMeta = rainfallStatus(rainfallValue);
 
-  const recommendation = getDecision(rainfallValue, moistureValue);
+  const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue), [rainfallValue, moistureValue]);
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const handleRainfallSubmit = async (event) => {
@@ -415,6 +425,8 @@ const RecommendationAIPage = () => {
         notes: rainfallForm.notes,
       });
       setRainfall(result.reading);
+      setSelectedNursery(rainfallForm.nursery || "all");
+      setSelectedBedengan(rainfallForm.bedengan || "all");
       setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
       setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
     } catch (submitError) {
