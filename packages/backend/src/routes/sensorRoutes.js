@@ -72,6 +72,7 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
       moisture: log.moisture ?? log.soil_moisture ?? null,
       soil_ph: log.soil_ph ?? null,
       temperature: log.temperature ?? null,
+      humidity: log.humidity ?? null,
       action: getMoistureStatus(log.moisture),
     }));
 

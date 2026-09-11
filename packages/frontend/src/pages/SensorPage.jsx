@@ -55,6 +55,22 @@ const StatusBadge = ({ isOnline }) => (
   </span>
 );
 
+const moistureConfig = {
+  Low:   { label: "Kering",  bg: "bg-orange-50",  text: "text-orange-700", dot: "bg-orange-500" },
+  Normal:{ label: "Normal",  bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  High:  { label: "Basah",   bg: "bg-sky-50",     text: "text-sky-700",    dot: "bg-sky-500" },
+};
+
+const MoistureBadge = ({ action }) => {
+  const cfg = moistureConfig[action] ?? { label: action ?? "-", bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+};
+
 const Metric = ({ icon: Icon, label, value, status, color = "text-[#1DAADF]" }) => (
   <div className="rounded-md border border-slate-200 p-4">
     <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -115,7 +131,7 @@ const SensorPage = () => {
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
         <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DAADF] text-white">
@@ -236,7 +252,7 @@ const SensorPage = () => {
 
         <section className={`${panelClass} mt-6 overflow-hidden`}>
           <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Data Terakhir</h2><p className="mt-1 text-xs text-slate-500">Riwayat pembacaan sensor terbaru</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Soil pH</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Status</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="6" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.soil_ph == null ? "-" : Number(log.soil_ph).toFixed(2)}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><StatusBadge isOnline={isOnline} /></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Soil pH</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="6" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.soil_ph == null ? "-" : Number(log.soil_ph).toFixed(2)}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge action={log.action} /></td></tr>)}</tbody></table></div>
         </section>
 
         <section className={`${panelClass} mt-6 p-5 sm:p-6`}><div className="flex items-start gap-3"><FiAlertCircle className="mt-0.5 text-lg text-slate-400" aria-hidden="true" /><div><h2 className="text-base font-bold text-slate-900">Catatan Status</h2><p className="mt-1 text-sm text-slate-500">{isOnline ? "Sensor sedang mengirimkan pembacaan terbaru." : "Sensor tidak mengirimkan pembacaan dalam periode terakhir."}</p></div></div></section>

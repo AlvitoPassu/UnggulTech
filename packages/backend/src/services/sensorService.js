@@ -7,9 +7,9 @@ let sensorIdMap;
 try {
   sensorIdMap = process.env.SENSOR_ID_MAP
     ? JSON.parse(process.env.SENSOR_ID_MAP)
-    : { sensor1: 1, sensor2: 2, sensor3: 3, sensor4: 4 };
+    : { sensor1: 1, sensor2: 2, sensor3: 3, sensor4: 4, sensor5: 5, sensor6: 6 };
 } catch {
-  sensorIdMap = { sensor1: 1, sensor2: 2, sensor3: 3, sensor4: 4 };
+  sensorIdMap = { sensor1: 1, sensor2: 2, sensor3: 3, sensor4: 4, sensor5: 5, sensor6: 6 };
 }
 
 export const getMoistureStatus = (moisture) => {
@@ -154,7 +154,7 @@ export async function getSensorData(sensorId) {
     humidity,
     status: getMoistureStatus(moisture),
     sensorStatus: sensorResponse.data?.status || "Unknown",
-    isOnline: minutesSinceLastReading <= 1,
+    isOnline: minutesSinceLastReading <= 3,
     lastSeen: latest.created_at,
   };
 }
@@ -194,7 +194,7 @@ export async function getNurseryOverview() {
   const sensorRows = sensors.map((sensor) => {
     const latest = latestBySensor.get(sensor.id);
     const lastSeen = latest?.created_at || null;
-    const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 1);
+    const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 3);
     const moisture = latest?.moisture === null || latest?.moisture === undefined ? null : Number(latest.moisture);
     const soilPh = latest?.soil_ph === null || latest?.soil_ph === undefined ? null : Number(latest.soil_ph);
 
