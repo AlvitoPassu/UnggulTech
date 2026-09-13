@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Area,
@@ -30,6 +30,18 @@ import { createRainfallReading, getLatestRainfall, getRainfallTrend } from "../a
 
 const panelClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
 const STORAGE_KEY = "unggul-ai-recommendation-history";
+
+// `all` means the rainfall API must receive no location filter.  Keep this
+// separate from sensor selection: selecting a fallback sensor must never turn
+// an unfiltered rainfall request into a request for that sensor's nursery.
+const getRainfallFilters = (nursery, bedengan) => ({
+  nursery: nursery && nursery !== "all" ? nursery : undefined,
+  bedengan: bedengan && bedengan !== "all" ? bedengan : undefined,
+});
+
+const getRainfallSelection = (value) => (
+  value === null || value === undefined || value === "" ? "all" : String(value)
+);
 
 const getLocalDate = () => {
   const date = new Date();
@@ -226,6 +238,7 @@ const RecommendationAIPage = () => {
   });
   const [rainfallSaving, setRainfallSaving] = useState(false);
   const [rainfallMessage, setRainfallMessage] = useState({ type: "", text: "" });
+  const rainfallRequestId = useRef(0);
 
   useEffect(() => {
     setSearchParams((current) => {
@@ -335,31 +348,29 @@ const RecommendationAIPage = () => {
 
   useEffect(() => {
     let isCurrent = true;
+    const requestId = ++rainfallRequestId.current;
     const fetchRainfall = async () => {
       setRainfallLoading(true);
       setRainfallError("");
-      const filters = {
-        nursery: selectedNursery === "all" ? undefined : selectedNursery,
-        bedengan: selectedBedengan === "all" ? undefined : selectedBedengan,
-      };
+      const filters = getRainfallFilters(selectedNursery, selectedBedengan);
 
       try {
         const [latestRainfall, rainfallSeries] = await Promise.all([
           getLatestRainfall(filters),
           getRainfallTrend(selectedPeriod, filters),
         ]);
-        if (isCurrent) {
+        if (isCurrent && requestId === rainfallRequestId.current) {
           setRainfall(latestRainfall ?? null);
           setRainfallTrend(Array.isArray(rainfallSeries) ? rainfallSeries : []);
         }
       } catch {
-        if (isCurrent) {
+        if (isCurrent && requestId === rainfallRequestId.current) {
           setRainfall(null);
           setRainfallTrend([]);
           setRainfallError("Gagal memuat data curah hujan.");
         }
       } finally {
-        if (isCurrent) setRainfallLoading(false);
+        if (isCurrent && requestId === rainfallRequestId.current) setRainfallLoading(false);
       }
     };
 
@@ -424,9 +435,13 @@ const RecommendationAIPage = () => {
         bedengan: rainfallForm.bedengan || null,
         notes: rainfallForm.notes,
       });
-      setRainfall(result.reading);
-      setSelectedNursery(rainfallForm.nursery || "all");
-      setSelectedBedengan(rainfallForm.bedengan || "all");
+      // The POST response is authoritative.  Invalidate any pending GET so a
+      // request started before this save cannot replace the saved record.
+      rainfallRequestId.current += 1;
+      setRainfall(result.reading ?? null);
+      setRainfallLoading(false);
+      setSelectedNursery(getRainfallSelection(result.reading?.nursery));
+      setSelectedBedengan(getRainfallSelection(result.reading?.bedengan));
       setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
       setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
     } catch (submitError) {
