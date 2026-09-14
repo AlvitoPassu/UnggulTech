@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createRainfallReading, getLatestRainfall, getRainfallHistory, getRainfallTrend } from "../services/rainfallService.js";
+import { createRainfallReading, getLatestRainfall, getRainfallHistory, getRainfallTrend, updateRainfallReading } from "../services/rainfallService.js";
 
 const router = Router();
 
@@ -32,6 +32,23 @@ router.post("/", async (req, res, next) => {
     return res.status(201).json({ message: "Data curah hujan berhasil disimpan.", reading });
   } catch (error) {
     if (error.statusCode === 400) return res.status(400).json({ message: error.message });
+    next(error);
+  }
+});
+
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== "object") {
+      return res.status(400).json({ message: "Payload tidak valid." });
+    }
+
+    const reading = await updateRainfallReading(req.params.id, body);
+    return res.json({ message: "Data curah hujan berhasil diperbarui.", reading });
+  } catch (error) {
+    if (error.statusCode === 400 || error.statusCode === 404) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
     next(error);
   }
 });

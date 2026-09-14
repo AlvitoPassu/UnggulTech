@@ -19,3 +19,8 @@ export const getRainfallHistory = async (params = {}) => {
   const response = await axios.get("/api/rainfall/history", { params });
   return response.data?.readings ?? [];
 };
+
+export const updateRainfallReading = async (id, payload = {}) => {
+  const response = await axios.patch(`/api/rainfall/${id}`, payload);
+  return response.data;
+};

@@ -25,7 +25,6 @@ import {
   getSensors,
   getSensorDisplayName,
 } from "../api/sensorApi";
-import { getRainfallHistory } from "../api/rainfallApi";
 
 const panelClass = "rounded-lg border border-slate-200 bg-white shadow-sm";
 
@@ -37,15 +36,6 @@ const formatLastSeen = (date) => {
   if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
 
   return `${Math.floor(diffMinutes / 60)} jam lalu`;
-};
-
-const formatMeasurementDate = (value) => {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("id-ID", {
-    timeZone: "Asia/Makassar",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 };
 
 const StatusBadge = ({ isOnline }) => (
@@ -87,9 +77,6 @@ const SensorPage = () => {
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
-  const [rainfallHistory, setRainfallHistory] = useState([]);
-  const [rainfallHistoryLoading, setRainfallHistoryLoading] = useState(true);
-  const [rainfallHistoryError, setRainfallHistoryError] = useState("");
 
   useEffect(() => {
     const fetchSensors = () => {
@@ -116,13 +103,6 @@ const SensorPage = () => {
     const interval = setInterval(fetchData, 30_000);
     return () => clearInterval(interval);
   }, [selectedSensorId]);
-
-  useEffect(() => {
-    getRainfallHistory()
-      .then(setRainfallHistory)
-      .catch(() => setRainfallHistoryError("Gagal memuat data curah hujan."))
-      .finally(() => setRainfallHistoryLoading(false));
-  }, []);
 
   const selectedSensor = sensors.find((sensor) => sensor.id === selectedSensorId);
   const isOnline = sensorData?.isOnline ?? false;
@@ -171,11 +151,6 @@ const SensorPage = () => {
           <p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Detail Sensor</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1>
         </div>
-
-        <section className={`${panelClass} mb-6 overflow-hidden`}>
-          <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Riwayat Curah Hujan</h2><p className="mt-1 text-xs text-slate-500">Pengukuran aktual dari tabung ombrometer</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Tanggal &amp; Waktu</th><th className="px-5 py-3">Nursery</th><th className="px-5 py-3">Bedengan</th><th className="px-5 py-3">Curah Hujan</th><th className="px-5 py-3">Sumber</th></tr></thead><tbody>{rainfallHistoryLoading ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Memuat data curah hujan...</td></tr> : rainfallHistoryError ? <tr><td colSpan="5" className="p-6 text-center text-red-600">{rainfallHistoryError}</td></tr> : rainfallHistory.length === 0 ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Belum ada pengukuran ombrometer.</td></tr> : rainfallHistory.map((reading) => <tr key={reading.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{formatMeasurementDate(reading.measured_at)}</td><td className="border-t border-slate-100 px-5 py-3">{reading.nursery || "-"}</td><td className="border-t border-slate-100 px-5 py-3">{reading.bedengan ? `Bedengan ${reading.bedengan}` : "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-semibold text-slate-800">{reading.rainfall_value} {reading.unit}</td><td className="border-t border-slate-100 px-5 py-3">{reading.source ? `${reading.source.charAt(0).toUpperCase()}${reading.source.slice(1)}` : "Ombrometer"}</td></tr>)}</tbody></table></div>
-        </section>
 
         <section className={`${panelClass} p-5 sm:p-6`}>
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">

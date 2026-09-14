@@ -107,3 +107,44 @@ export async function createRainfallReading(payload = {}) {
   if (error) throw error;
   return data;
 }
+
+export async function updateRainfallReading(id, payload = {}) {
+  if (!id || !/^\d+$/.test(String(id).trim())) {
+    const error = new Error("ID data curah hujan tidak valid.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const rawRainfallValue = payload.rainfall_value;
+  const rainfallValue = Number(rawRainfallValue);
+  const measuredAt = new Date(payload.measured_at);
+
+  if (rawRainfallValue === null || rawRainfallValue === undefined || String(rawRainfallValue).trim() === "" || !Number.isFinite(rainfallValue) || rainfallValue < 0) {
+    const error = new Error("Nilai curah hujan harus berupa angka nol atau lebih.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!payload.measured_at || Number.isNaN(measuredAt.getTime())) {
+    const error = new Error("Tanggal dan waktu pengukuran tidak valid.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const nursery = payload.nursery ? String(payload.nursery).trim() : null;
+  const bedengan = payload.bedengan === null || payload.bedengan === undefined || payload.bedengan === "" ? null : String(payload.bedengan).trim();
+  const notes = payload.notes === null || payload.notes === undefined || String(payload.notes).trim() === "" ? null : String(payload.notes).trim();
+  const { data, error } = await supabase
+    .from("rainfall_readings")
+    .update({ nursery, bedengan, rainfall_value: rainfallValue, measured_at: measuredAt.toISOString(), notes })
+    .eq("id", id)
+    .select(rainfallSelect)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    const notFoundError = new Error("Data curah hujan tidak ditemukan.");
+    notFoundError.statusCode = 404;
+    throw notFoundError;
+  }
+  return data;
+}

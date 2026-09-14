@@ -238,7 +238,14 @@ const RecommendationAIPage = () => {
   });
   const [rainfallSaving, setRainfallSaving] = useState(false);
   const [rainfallMessage, setRainfallMessage] = useState({ type: "", text: "" });
+  const [rainfallRefreshVersion, setRainfallRefreshVersion] = useState(0);
   const rainfallRequestId = useRef(0);
+
+  useEffect(() => {
+    const refreshRainfall = () => setRainfallRefreshVersion((version) => version + 1);
+    window.addEventListener("rainfall:updated", refreshRainfall);
+    return () => window.removeEventListener("rainfall:updated", refreshRainfall);
+  }, []);
 
   useEffect(() => {
     setSearchParams((current) => {
@@ -378,7 +385,7 @@ const RecommendationAIPage = () => {
     return () => {
       isCurrent = false;
     };
-  }, [refreshToken, selectedBedengan, selectedNursery, selectedPeriod]);
+  }, [rainfallRefreshVersion, refreshToken, selectedBedengan, selectedNursery, selectedPeriod]);
 
   const nurseryOptions = useMemo(
     () => [...new Set(sensors.map((sensor) => sensor.location).filter(Boolean))],
