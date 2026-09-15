@@ -144,19 +144,80 @@ const rainfallStatus = (value) => {
   return { label: "Mencapai/Melewati Ambang", tone: "normal" };
 };
 
-const getDecision = (rainfall, moisture) => {
-  const rainfallValue = Number(rainfall);
-  const moistureValue = Number(moisture);
+const getDecision = (rainfall, moisture, isOnline, selectedBedengan) => {
+  if (selectedBedengan === "all") {
+    return {
+      status: "PILIH BEDENGAN",
+      title: "Pilih Bedengan",
+      duration: "-",
+      schedule: "-",
+      reason: "Silakan pilih bedengan spesifik untuk mendapatkan rekomendasi tindakan. Sistem tidak memberikan rekomendasi penyiraman massal.",
+      target: "40% – 70%",
+      priority: "NEUTRAL",
+    };
+  }
 
+  if (moisture === null || moisture === undefined || Number.isNaN(Number(moisture))) {
+    return {
+      status: "DATA TIDAK TERSEDIA",
+      title: "Data Tidak Tersedia",
+      duration: "-",
+      schedule: "-",
+      reason: "Data kelembaban tanah (soil moisture) belum tersedia atau tidak valid. Sistem tidak dapat memberikan rekomendasi penyiraman.",
+      target: "40% – 70%",
+      priority: "NEUTRAL",
+    };
+  }
+
+  if (isOnline === false) {
+    return {
+      status: "SENSOR OFFLINE",
+      title: "Data Sensor Tidak Terbarui",
+      duration: "-",
+      schedule: "-",
+      reason: "Data sensor tidak terbarui. Periksa koneksi sensor sebelum mengambil tindakan operasional.",
+      target: "40% – 70%",
+      priority: "ATTENTION",
+    };
+  }
+
+  const moistureValue = Number(moisture);
+  const rainfallValue = Number(rainfall);
+  
+  if (moistureValue > 70) {
+    return {
+      status: "TERLALU BASAH",
+      title: "Jangan Lakukan Penyiraman",
+      duration: "-",
+      schedule: "-",
+      reason: "Kelembaban tanah berada di atas kisaran target sehingga penyiraman tidak direkomendasikan.",
+      target: "40% – 70%",
+      priority: "NORMAL",
+    };
+  }
+  
+  if (moistureValue >= 40 && moistureValue <= 70) {
+    return {
+      status: "NORMAL",
+      title: "Tidak Perlu Penyiraman",
+      duration: "-",
+      schedule: "-",
+      reason: "Kelembaban tanah berada dalam kisaran target.",
+      target: "40% – 70%",
+      priority: "NORMAL",
+    };
+  }
+
+  // Moisture < 40
   if (!Number.isFinite(rainfallValue)) {
     return {
       status: "PERLU PERHATIAN",
       title: "Menunggu data curah hujan",
       duration: "-",
       schedule: "Pagi & Sore",
-      reason: "Data curah hujan belum tersedia. Rekomendasi penyiraman menunggu validasi dari ombrometer atau data sensor yang tersedia.",
+      reason: "Kelembaban tanah terpantau kering, namun data curah hujan belum tersedia. Rekomendasi penyiraman menunggu validasi dari ombrometer.",
       target: "40% – 70%",
-      priority: "PERLU PERHATIAN",
+      priority: "ATTENTION",
     };
   }
 
@@ -166,20 +227,18 @@ const getDecision = (rainfall, moisture) => {
       title: "Lakukan Penyiraman",
       duration: "30 menit",
       schedule: "Pagi & Sore",
-      reason: "Curah hujan berada di bawah ambang SOP perusahaan.",
+      reason: "Kelembaban tanah berada di bawah batas minimum dan curah hujan berada di bawah ambang SOP perusahaan.",
       target: "40% – 70%",
       priority: "TINDAKAN DIPERLUKAN",
     };
   }
 
-  const moistureLabel = moistureValue === null || Number.isNaN(moistureValue) ? "Data kelembaban belum tersedia" : moistureStatus(moistureValue).label;
-
   return {
     status: "NORMAL",
-    title: "Tidak Perlu Penyiraman",
+    title: "Tidak Perlu Penyiraman otomatis",
     duration: "-",
-    schedule: "Pagi & Sore",
-    reason: `Curah hujan telah mencapai atau melewati ambang SOP perusahaan. ${moistureLabel !== "Data kelembaban belum tersedia" ? `Kondisi kelembaban tanah saat ini tercatat ${moistureLabel.toLowerCase()}.` : "Kondisi kelembaban tanah belum tersedia untuk validasi tambahan."}`,
+    schedule: "-",
+    reason: "Kelembaban tanah rendah, namun curah hujan telah memenuhi ambang SOP perusahaan.",
     target: "40% – 70%",
     priority: "NORMAL",
   };
@@ -287,7 +346,10 @@ const RecommendationAIPage = () => {
 
         const nextBedengan = selectedBedengan === "all" ? "" : selectedBedengan;
 
-        const resolvedSensor = filteredByNursery.find((sensor) => String(sensor.bedengan) === String(nextBedengan)) || filteredByNursery[0] || sensorList[0];
+        let resolvedSensor = null;
+        if (nextBedengan) {
+          resolvedSensor = filteredByNursery.find((sensor) => String(sensor.bedengan) === String(nextBedengan));
+        }
         const nextSensorId = resolvedSensor?.id ? String(resolvedSensor.id) : "";
 
         if (nextSensorId) {
@@ -416,7 +478,7 @@ const RecommendationAIPage = () => {
   const rainfallValue = rainfallRaw === null || rainfallRaw === undefined || rainfallRaw === "" ? null : Number(rainfallRaw);
   const rainfallMeta = rainfallStatus(rainfallValue);
 
-  const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue), [rainfallValue, moistureValue]);
+  const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan), [rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan]);
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const doSaveRainfall = async (inputValue, measuredAt) => {
@@ -719,7 +781,7 @@ const RecommendationAIPage = () => {
                 <p className="mb-1 text-sm font-medium text-[#1DAADF]">SOP / Keputusan</p>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">Rekomendasi Tindakan</h2>
               </div>
-              <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide ${toneClasses[recommendation.status === "NORMAL" ? "normal" : recommendation.status === "TINDAKAN DIPERLUKAN" ? "critical" : "attention"]}`}>
+              <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide ${toneClasses[recommendation.priority === "NORMAL" ? "normal" : recommendation.priority === "TINDAKAN DIPERLUKAN" ? "critical" : recommendation.priority === "NEUTRAL" ? "neutral" : "attention"]}`}>
                 {recommendation.status}
               </span>
             </div>
@@ -793,9 +855,7 @@ const RecommendationAIPage = () => {
               <div>
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Kesimpulan</p>
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-3 leading-6 text-slate-700">
-                  {recommendation.title === "Lakukan Penyiraman"
-                    ? "Kelembaban tanah berada di bawah kisaran target dan curah hujan masih berada di bawah ambang SOP perusahaan. Berdasarkan SOP, penyiraman perlu dilakukan selama 30 menit."
-                    : recommendation.reason}
+                  {recommendation.reason}
                 </p>
               </div>
 
