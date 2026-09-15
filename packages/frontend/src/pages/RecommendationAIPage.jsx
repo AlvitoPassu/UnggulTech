@@ -27,6 +27,8 @@ import { getForecast } from "../api/weatherApi";
 import { getHistoricalTrend, getHistoricalReadings } from "../api/historicalApi";
 import { getSensorData, getSensors } from "../api/sensorApi";
 import { createRainfallReading, getLatestRainfall, getRainfallTrend } from "../api/rainfallApi";
+import { useAuth } from "../context/AuthContext";
+import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
 
 const panelClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
 const STORAGE_KEY = "unggul-ai-recommendation-history";
@@ -209,6 +211,7 @@ const ChartCard = ({ title, description, data, color, children, emptyText }) => 
 
 const RecommendationAIPage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, executeProtectedAction, openLoginModal } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sensors, setSensors] = useState([]);
   const [selectedSensorId, setSelectedSensorId] = useState("");
@@ -416,6 +419,42 @@ const RecommendationAIPage = () => {
   const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue), [rainfallValue, moistureValue]);
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
+  const doSaveRainfall = async (inputValue, measuredAt) => {
+    setRainfallSaving(true);
+    try {
+      const result = await createRainfallReading({
+        rainfall_value: inputValue,
+        unit: "ml",
+        measured_at: measuredAt.toISOString(),
+        nursery: rainfallForm.nursery || null,
+        bedengan: rainfallForm.bedengan || null,
+        notes: rainfallForm.notes,
+      });
+      rainfallRequestId.current += 1;
+      setRainfall(result.reading ?? null);
+      setRainfallLoading(false);
+      setSelectedNursery(getRainfallSelection(result.reading?.nursery));
+      setSelectedBedengan(getRainfallSelection(result.reading?.bedengan));
+      setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
+      setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
+    } catch (submitError) {
+      if (submitError.response?.status === 401) {
+        setRainfallMessage({
+          type: "error",
+          text: "Sesi Anda telah kedaluwarsa. Silakan login kembali untuk menyimpan data.",
+        });
+        openLoginModal(() => doSaveRainfall(inputValue, measuredAt));
+      } else {
+        setRainfallMessage({
+          type: "error",
+          text: submitError.response?.data?.message || "Gagal menyimpan data curah hujan.",
+        });
+      }
+    } finally {
+      setRainfallSaving(false);
+    }
+  };
+
   const handleRainfallSubmit = async (event) => {
     event.preventDefault();
     setRainfallMessage({ type: "", text: "" });
@@ -432,30 +471,12 @@ const RecommendationAIPage = () => {
       return;
     }
 
-    setRainfallSaving(true);
-    try {
-      const result = await createRainfallReading({
-        rainfall_value: inputValue,
-        unit: "ml",
-        measured_at: measuredAt.toISOString(),
-        nursery: rainfallForm.nursery || null,
-        bedengan: rainfallForm.bedengan || null,
-        notes: rainfallForm.notes,
-      });
-      // The POST response is authoritative.  Invalidate any pending GET so a
-      // request started before this save cannot replace the saved record.
-      rainfallRequestId.current += 1;
-      setRainfall(result.reading ?? null);
-      setRainfallLoading(false);
-      setSelectedNursery(getRainfallSelection(result.reading?.nursery));
-      setSelectedBedengan(getRainfallSelection(result.reading?.bedengan));
-      setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
-      setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
-    } catch (submitError) {
-      setRainfallMessage({ type: "error", text: submitError.response?.data?.message || "Gagal menyimpan data curah hujan." });
-    } finally {
-      setRainfallSaving(false);
+    if (!isAuthenticated) {
+      executeProtectedAction(() => doSaveRainfall(inputValue, measuredAt));
+      return;
     }
+
+    await doSaveRainfall(inputValue, measuredAt);
   };
 
   const primaryTrend = useMemo(
@@ -535,6 +556,7 @@ const RecommendationAIPage = () => {
                 <FiRefreshCw className={loading ? "animate-spin" : ""} aria-hidden="true" />
               </button>
             </div>
+            <HeaderAuthStatus />
           </div>
         </div>
       </header>

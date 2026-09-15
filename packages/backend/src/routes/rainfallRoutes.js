@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { createRainfallReading, getLatestRainfall, getRainfallHistory, getRainfallTrend, updateRainfallReading } from "../services/rainfallService.js";
+import { requireAuth } from "../middleware/authMiddleware.js";
+import { logAudit } from "../services/auditService.js";
 
 const router = Router();
 
@@ -21,7 +23,7 @@ router.get("/trend", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", requireAuth, async (req, res, next) => {
   try {
     const body = req.body;
     if (!body || typeof body !== "object") {
@@ -29,6 +31,22 @@ router.post("/", async (req, res, next) => {
     }
 
     const reading = await createRainfallReading(body);
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "RAINFALL_CREATE",
+      resource: "rainfall_readings",
+      resourceId: reading?.id,
+      metadata: {
+        bedengan: reading?.bedengan,
+        nursery: reading?.nursery,
+        rainfall_value: reading?.rainfall_value,
+        unit: reading?.unit,
+        measured_at: reading?.measured_at,
+      },
+      req,
+    });
+
     return res.status(201).json({ message: "Data curah hujan berhasil disimpan.", reading });
   } catch (error) {
     if (error.statusCode === 400) return res.status(400).json({ message: error.message });
@@ -36,7 +54,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.patch("/:id", async (req, res, next) => {
+router.patch("/:id", requireAuth, async (req, res, next) => {
   try {
     const body = req.body;
     if (!body || typeof body !== "object") {
@@ -44,6 +62,22 @@ router.patch("/:id", async (req, res, next) => {
     }
 
     const reading = await updateRainfallReading(req.params.id, body);
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "RAINFALL_UPDATE",
+      resource: "rainfall_readings",
+      resourceId: req.params.id,
+      metadata: {
+        rainfall_value: reading?.rainfall_value,
+        measured_at: reading?.measured_at,
+        bedengan: reading?.bedengan,
+        nursery: reading?.nursery,
+        notes: reading?.notes,
+      },
+      req,
+    });
+
     return res.json({ message: "Data curah hujan berhasil diperbarui.", reading });
   } catch (error) {
     if (error.statusCode === 400 || error.statusCode === 404) {
@@ -61,4 +95,5 @@ router.get("/history", async (req, res, next) => {
     next(error);
   }
 });
+
 export default router;

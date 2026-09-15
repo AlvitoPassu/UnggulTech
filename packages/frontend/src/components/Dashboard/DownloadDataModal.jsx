@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { downloadSensorReport, getSensorDisplayName } from "../../api/sensorApi";
+import { useAuth } from "../../context/AuthContext";
 
 const periodOptions = [
   { value: "daily", label: "Per Hari" },
@@ -52,6 +53,7 @@ const getFilename = (contentDisposition, fallbackFilename) => {
 };
 
 const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
+  const { openLoginModal } = useAuth();
   const [sensorId, setSensorId] = useState(selectedSensorId);
   const [period, setPeriod] = useState("daily");
   const [date, setDate] = useState("");
@@ -127,12 +129,19 @@ const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
       link.click();
       link.remove();
       URL.revokeObjectURL(fileUrl);
-      setNotification({ type: "success", message: "Laporan berhasil diunduh." });
-    } catch {
-      setNotification({
-        type: "error",
-        message: "Download gagal. Pastikan layanan laporan backend sudah tersedia.",
-      });
+    } catch (downloadErr) {
+      if (downloadErr.response?.status === 401) {
+        setNotification({
+          type: "error",
+          message: "Sesi Anda telah kedaluwarsa. Silakan login kembali.",
+        });
+        openLoginModal();
+      } else {
+        setNotification({
+          type: "error",
+          message: "Download gagal. Pastikan layanan laporan backend sudah tersedia.",
+        });
+      }
     } finally {
       setIsDownloading(false);
     }

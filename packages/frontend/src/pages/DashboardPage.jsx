@@ -6,6 +6,7 @@ import NurserySummaryCards from "../components/Dashboard/NurserySummaryCards";
 import SensorStatusOverview from "../components/Dashboard/SensorStatusOverview";
 import SoilMoistureCondition from "../components/Dashboard/SoilMoistureCondition";
 import WeatherCard from "../components/Dashboard/WeatherCard";
+import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
 import { getNurseryMoistureTrend, getNurseryOverview } from "../api/sensorApi";
 
 const DashboardPage = () => {
@@ -67,6 +68,7 @@ const DashboardPage = () => {
               <div><p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p><p className="text-xs font-semibold text-slate-700">{isLoading ? "Memuat data..." : formattedLastUpdated}</p></div>
               <button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-[#1DAADF]" aria-label="Refresh data"><FiRefreshCw aria-hidden="true" /></button>
             </div>
+            <HeaderAuthStatus />
           </div>
         </div>
       </header>

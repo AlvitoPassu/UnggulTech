@@ -7,6 +7,7 @@ import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
 import rainfallRoutes from "./routes/rainfallRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 if (!process.env.GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY is not configured.");
@@ -28,6 +29,7 @@ app.use("/api/weather", weatherRoutes);
 app.use("/api/historical-readings", historicalRoutes);
 app.use("/api/rainfall", rainfallRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/auth", authRoutes);
 
 // Global Error Handler
 app.use((error, _req, res, _next) => {
@@ -38,3 +40,6 @@ app.use((error, _req, res, _next) => {
 app.listen(config.port, () => {
   console.log(`Backend listening on http://localhost:${config.port}`);
 });
+
+export { app };
+export default app;

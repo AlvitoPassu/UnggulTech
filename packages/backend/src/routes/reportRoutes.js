@@ -8,10 +8,12 @@ import {
   sendXlsx,
   sendPdf,
 } from "../services/reportService.js";
+import { requireAuth } from "../middleware/authMiddleware.js";
+import { logAudit } from "../services/auditService.js";
 
 const router = Router();
 
-router.post("/download", async (req, res, next) => {
+router.post("/download", requireAuth, async (req, res, next) => {
   try {
     const filters = validateRequest(req.body);
     if (!filters) {
@@ -22,6 +24,20 @@ router.post("/download", async (req, res, next) => {
     const rows = reportRows(logs);
     const filename = makeFilename(filters.sensorId, filters.startDate, filters.endDate, filters.format);
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+
+    await logAudit({
+      userId: req.user?.id,
+      action: "DOWNLOAD_HISTORICAL_DATA",
+      resource: "sensor_readings",
+      metadata: {
+        format: filters.format,
+        sensor_id: filters.sensorId,
+        start_date: filters.startDate,
+        end_date: filters.endDate,
+        total_rows: rows.length,
+      },
+      req,
+    });
 
     if (filters.format === "csv") {
       return sendCsv(res, rows);

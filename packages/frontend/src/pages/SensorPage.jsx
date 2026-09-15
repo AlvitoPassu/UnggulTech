@@ -25,6 +25,7 @@ import {
   getSensors,
   getSensorDisplayName,
 } from "../api/sensorApi";
+import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
 
 const panelClass = "rounded-lg border border-slate-200 bg-white shadow-sm";
 
@@ -142,6 +143,7 @@ const SensorPage = () => {
                 {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
               </select>
             </div>
+            <HeaderAuthStatus />
           </div>
         </div>
       </header>
