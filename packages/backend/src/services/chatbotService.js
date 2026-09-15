@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { getHistoricalStatistics, getHistoricalTrend } from "./historicalService.js";
 import { getNurseryOverview } from "./sensorService.js";
 import { getWeatherForecast } from "./weatherService.js";
+import { getLatestRainfall } from "./rainfallService.js";
 import { validateChatbotTopic } from "./domainGuard.js";
 
 const SYSTEM_INSTRUCTION = `Anda adalah Unggul AI Assistant untuk sistem Smart Soil Monitoring nursery bibit kelapa sawit.
@@ -61,7 +62,7 @@ const getQuestionNeeds = (message) => {
   return {
     overview: /nursery|ringkasan|kondisi|bibit|sensor|bedengan|moisture|kelembapan|kering|offline|status|terbaru|perlu disiram|penyiraman/.test(question),
     history: /7\s*hari|seminggu|historis|riwayat|tren|menurun|meningkat|perubahan/.test(question),
-    weather: /hujan|curah|cuaca|siram|penyiraman/.test(question),
+    weather: /hujan|curah|cuaca|siram|penyiraman|rainfall/.test(question),
   };
 };
 
@@ -80,13 +81,14 @@ const getHistoricalContext = async (needsHistory) => {
 
 async function buildNurseryContext(message) {
   const needs = getQuestionNeeds(message);
-  const [overview, historical, weatherResult] = await Promise.all([
+  const [overview, historical, weatherResult, rainfallResult] = await Promise.all([
     needs.overview ? getNurseryOverview() : null,
     getHistoricalContext(needs.history),
     needs.weather ? getWeatherForecast().catch(() => null) : null,
+    needs.weather ? getLatestRainfall().catch(() => null) : null,
   ]);
 
-  if (!overview && !historical && !weatherResult) {
+  if (!overview && !historical && !weatherResult && !rainfallResult) {
     return {
       generatedAt: new Date().toISOString(),
       note: "Pertanyaan ini tidak membutuhkan data monitoring tambahan.",
@@ -121,10 +123,24 @@ async function buildNurseryContext(message) {
   } : null;
 
   if (needs.weather) {
-    context.rainfall = {
-      available: false,
-      note: "Sistem saat ini tidak menyediakan data curah hujan dalam konteks chatbot.",
-    };
+    if (rainfallResult && rainfallResult.available && rainfallResult.reading) {
+      context.rainfall = {
+        available: true,
+        type: "recorded_measurement",
+        source: "rainfall_readings",
+        rainfall_value: rainfallResult.reading.rainfall_value,
+        unit: rainfallResult.reading.unit,
+        measured_at: rainfallResult.reading.measured_at,
+        nursery: rainfallResult.reading.nursery,
+        bedengan: rainfallResult.reading.bedengan,
+        notes: rainfallResult.reading.notes
+      };
+    } else {
+      context.rainfall = {
+        available: false,
+        note: "Data pengukuran curah hujan aktual tidak tersedia atau belum tercatat."
+      };
+    }
   }
 
   return context;
