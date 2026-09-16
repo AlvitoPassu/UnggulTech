@@ -9,7 +9,12 @@ const periodOptions = [
   { value: "custom", label: "Rentang Tanggal" },
 ];
 
-const statusOptions = ["", "Normal", "Kering", "Basah"];
+const statusOptions = [
+  { value: "", label: "Semua Status" },
+  { value: "Low", label: "Kering" },
+  { value: "Normal", label: "Normal" },
+  { value: "High", label: "Basah" },
+];
 const formatOptions = [
   { value: "csv", label: "CSV" },
   { value: "xlsx", label: "Excel (.xlsx)" },
@@ -197,7 +202,7 @@ const DownloadDataModal = ({ sensors, selectedSensorId, onClose }) => {
           <label className="block text-sm font-medium text-gray-700">
             Filter Status
             <select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-[#1DAADF] focus:outline-none focus:ring-2 focus:ring-[#a3e1f5]">
-              {statusOptions.map((option) => <option key={option || "all"} value={option}>{option || "Semua Status"}</option>)}
+              {statusOptions.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
             </select>
           </label>
 

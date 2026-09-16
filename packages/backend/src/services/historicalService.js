@@ -10,6 +10,19 @@ const getDateRange = ({ startDate, endDate }) => {
   return { startUtc, endExclusiveUtc };
 };
 
+const sourceHasCanonicalStatus = config.logsTable === "sensor_logs";
+
+const getCanonicalStatus = (moisture) => {
+  if (typeof moisture !== "number" && typeof moisture !== "string") return null;
+  if (typeof moisture === "string" && moisture.trim() === "") return null;
+
+  const value = Number(moisture);
+  if (!Number.isFinite(value)) return null;
+  if (value < 40) return "Low";
+  if (value > 70) return "High";
+  return "Normal";
+};
+
 async function resolveSensorIds(bedengan) {
   if (bedengan === undefined) return null;
 
@@ -53,9 +66,12 @@ export async function getHistoricalReadings(filters) {
     return { readings: [], pagination: { page: filters.page, limit: filters.limit, total: 0, totalPages: 0, hasNext: false, hasPrevious: filters.page > 1 } };
   }
 
+  const select = sourceHasCanonicalStatus
+    ? "id, sensor_id, moisture, soil_ph, temperature, humidity, status, created_at, sensors (sensor_name, bedengan, location)"
+    : "id, sensor_id, moisture, soil_ph, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)";
   let query = supabase
     .from(config.logsTable)
-    .select("id, sensor_id, moisture, soil_ph, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)", { count: "exact" });
+    .select(select, { count: "exact" });
   query = applyReadingFilters(query, filters, sensorIds);
   query = query.order(filters.sort.column, { ascending: filters.sort.ascending });
 
@@ -66,7 +82,11 @@ export async function getHistoricalReadings(filters) {
   const total = count ?? 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / filters.limit);
   return {
-    readings: (data ?? []).map(({ sensors, ...reading }) => ({ ...reading, sensor: sensors, status: null })),
+    readings: (data ?? []).map(({ sensors, ...reading }) => ({
+      ...reading,
+      sensor: sensors,
+      status: sourceHasCanonicalStatus ? reading.status : getCanonicalStatus(reading.moisture),
+    })),
     pagination: {
       page: filters.page,
       limit: filters.limit,
