@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { witaDateFormatter } from "../utils/dateHelper.js";
 
 const rainfallSelect = "id, nursery, bedengan, rainfall_value, unit, measured_at, source, notes, created_at";
 
@@ -7,6 +8,23 @@ const applyLocationFilters = (query, { nursery, bedengan } = {}) => {
   if (nursery) filteredQuery = filteredQuery.eq("nursery", nursery);
   if (bedengan) filteredQuery = filteredQuery.eq("bedengan", bedengan);
   return filteredQuery;
+};
+
+export const getRainfallFreshness = (reading, now = new Date()) => {
+  if (!reading) return { freshness: "missing", isFresh: false };
+
+  const measuredAtValue = reading.measured_at;
+  if (measuredAtValue === null || measuredAtValue === undefined || (typeof measuredAtValue === "string" && measuredAtValue.trim() === "")) {
+    return { freshness: "stale", isFresh: false };
+  }
+
+  const measuredAt = new Date(measuredAtValue);
+  if (Number.isNaN(measuredAt.getTime()) || Number.isNaN(now.getTime())) {
+    return { freshness: "stale", isFresh: false };
+  }
+
+  const isFresh = witaDateFormatter.format(measuredAt) === witaDateFormatter.format(now);
+  return { freshness: isFresh ? "fresh" : "stale", isFresh };
 };
 
 export async function getLatestRainfall(filters = {}) {
@@ -21,7 +39,7 @@ export async function getLatestRainfall(filters = {}) {
   query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
-  return { available: Boolean(data), reading: data };
+  return { available: Boolean(data), reading: data, ...getRainfallFreshness(data) };
 }
 
 export async function getRainfallHistory(filters = {}) {

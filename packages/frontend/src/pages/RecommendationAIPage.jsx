@@ -70,12 +70,15 @@ const getStoredHistory = () => {
 };
 
 const formatWita = (value, options = {}) => {
-  if (!value) return "Belum ada data";
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return "Belum ada data";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Belum ada data";
 
   return new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Makassar",
     ...options,
-  }).format(new Date(value));
+  }).format(date);
 };
 
 const formatDisplayDate = (value) => {
@@ -144,7 +147,13 @@ const rainfallStatus = (value) => {
   return { label: "Mencapai/Melewati Ambang", tone: "normal" };
 };
 
-const getDecision = (rainfall, moisture, isOnline, selectedBedengan) => {
+const rainfallFreshnessStatus = (freshness) => {
+  if (freshness === "fresh") return { label: "Fresh", tone: "normal", description: "Pengukuran hari ini (WITA)" };
+  if (freshness === "stale") return { label: "Stale", tone: "attention", description: "Pengukuran terakhir bukan hari ini (WITA)" };
+  return { label: "Missing", tone: "neutral", description: "Belum ada pengukuran" };
+};
+
+const getDecision = (rainfall, moisture, isOnline, selectedBedengan, rainfallFreshness = "missing") => {
   if (selectedBedengan === "all") {
     return {
       status: "PILIH BEDENGAN",
@@ -209,10 +218,34 @@ const getDecision = (rainfall, moisture, isOnline, selectedBedengan) => {
   }
 
   // Moisture < 40
+  if (rainfallFreshness === "stale") {
+    return {
+      status: "PERLU PERHATIAN",
+      title: "Data Curah Hujan Tidak Terbaru",
+      duration: "-",
+      schedule: "Menunggu pengukuran terbaru",
+      reason: "Kelembaban tanah terpantau kering, tetapi pengukuran curah hujan terakhir bukan dari hari ini. Sistem tidak membuat keputusan penyiraman berdasarkan data curah hujan lama.",
+      target: "40% - 70%",
+      priority: "ATTENTION",
+    };
+  }
+
+  if (rainfallFreshness === "missing") {
+    return {
+      status: "PERLU PERHATIAN",
+      title: "Data Curah Hujan Belum Tersedia",
+      duration: "-",
+      schedule: "Pagi & Sore",
+      reason: "Kelembaban tanah terpantau kering, namun data curah hujan belum tersedia. Rekomendasi penyiraman menunggu validasi dari ombrometer.",
+      target: "40% - 70%",
+      priority: "ATTENTION",
+    };
+  }
+
   if (!Number.isFinite(rainfallValue)) {
     return {
       status: "PERLU PERHATIAN",
-      title: "Menunggu data curah hujan",
+      title: "Data Curah Hujan Belum Tersedia",
       duration: "-",
       schedule: "Pagi & Sore",
       reason: "Kelembaban tanah terpantau kering, namun data curah hujan belum tersedia. Rekomendasi penyiraman menunggu validasi dari ombrometer.",
@@ -474,11 +507,14 @@ const RecommendationAIPage = () => {
   const phRaw = selectedSensorData?.soilPh ?? selectedSensorData?.soil_ph ?? null;
   const phValue = phRaw === null || phRaw === undefined || phRaw === "" ? null : Number(phRaw);
   const phMeta = phStatus(phValue);
-  const rainfallRaw = rainfall?.rainfall_value ?? rainfall?.rainfall_mm ?? rainfall?.value ?? rainfall?.amount ?? null;
+  const rainfallReading = rainfall?.reading ?? null;
+  const rainfallRaw = rainfallReading?.rainfall_value ?? rainfallReading?.rainfall_mm ?? rainfallReading?.value ?? rainfallReading?.amount ?? null;
   const rainfallValue = rainfallRaw === null || rainfallRaw === undefined || rainfallRaw === "" ? null : Number(rainfallRaw);
   const rainfallMeta = rainfallStatus(rainfallValue);
+  const rainfallFreshness = rainfall?.freshness ?? "missing";
+  const rainfallFreshnessMeta = rainfallFreshnessStatus(rainfallFreshness);
 
-  const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan), [rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan]);
+  const recommendation = useMemo(() => getDecision(rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan, rainfallFreshness), [rainfallValue, moistureValue, selectedSensorData?.isOnline, selectedBedengan, rainfallFreshness]);
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const doSaveRainfall = async (inputValue, measuredAt) => {
@@ -493,8 +529,9 @@ const RecommendationAIPage = () => {
         notes: rainfallForm.notes,
       });
       rainfallRequestId.current += 1;
-      setRainfall(result.reading ?? null);
+      setRainfall(null);
       setRainfallLoading(false);
+      setRainfallRefreshVersion((version) => version + 1);
       setSelectedNursery(getRainfallSelection(result.reading?.nursery));
       setSelectedBedengan(getRainfallSelection(result.reading?.bedengan));
       setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
@@ -704,16 +741,18 @@ const RecommendationAIPage = () => {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                 <FiCloudRain className="text-lg" aria-hidden="true" />
               </div>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${toneClasses[rainfallMeta.tone]}`}>{rainfallMeta.label}</span>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${toneClasses[rainfallFreshnessMeta.tone]}`}>{rainfallFreshnessMeta.label}</span>
             </div>
             <p className="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">Curah Hujan</p>
             <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} ml` : "-"}</p>
             <p className="mt-3 text-[11px] text-slate-500">Threshold SOP: 10 ml</p>
             <p className="mt-1 text-[11px] text-slate-500">Status: {rainfallMeta.label}</p>
+            <p className="mt-1 text-[11px] text-slate-500">Validitas data: {rainfallFreshnessMeta.description}</p>
+            {rainfallReading?.measured_at && <p className="mt-1 text-[11px] text-slate-500">Diukur: {formatWita(rainfallReading.measured_at, { dateStyle: "medium", timeStyle: "short" })} WITA</p>}
             {rainfallLoading && <p className="mt-1 text-[11px] text-slate-500">Memuat data curah hujan...</p>}
             {!rainfallLoading && rainfallError && <p className="mt-1 text-[11px] text-red-600">{rainfallError}</p>}
             {!rainfallLoading && !rainfallError && rainfallValue === null && <p className="mt-1 text-[11px] text-slate-500">Belum ada pengukuran ombrometer.</p>}
-            <p className="mt-1 text-[11px] text-slate-500">Sumber: {rainfall?.source || (rainfallValue === null ? "-" : "Ombrometer")}</p>
+            <p className="mt-1 text-[11px] text-slate-500">Sumber: {rainfallReading?.source || (rainfallValue === null ? "-" : "Ombrometer")}</p>
             <div className="mt-auto h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[5, 8, 12, 9, 14, 10, 11].map((point, index) => (

@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const getLatestRainfall = async (params = {}) => {
   const response = await axios.get("/api/rainfall/latest", { params });
-  return response.data?.reading ?? null;
+  return response.data ?? null;
 };
 
 export const getRainfallTrend = async (period = "7d", params = {}) => {
