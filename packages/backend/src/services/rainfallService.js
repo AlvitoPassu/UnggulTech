@@ -1,9 +1,20 @@
 import { supabase } from "../config/supabase.js";
 import { witaDateFormatter } from "../utils/dateHelper.js";
+import { parseStrictFiniteNumber } from "../utils/strictNumber.js";
 
 const rainfallSelect = "id, nursery, bedengan, rainfall_value, unit, measured_at, source, notes, created_at";
 
 const withMillimeterUnit = (reading) => (reading ? { ...reading, unit: "mm" } : reading);
+
+export const parseRainfallValue = (rawValue) => {
+  const rainfallValue = parseStrictFiniteNumber(rawValue);
+  if (rainfallValue === null || rainfallValue < 0) {
+    const error = new Error("Nilai curah hujan harus berupa angka nol atau lebih.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return rainfallValue;
+};
 
 const applyLocationFilters = (query, { nursery, bedengan } = {}) => {
   let filteredQuery = query;
@@ -96,15 +107,10 @@ export async function getRainfallTrend(period = "7d", filters = {}) {
 }
 
 export async function createRainfallReading(payload = {}) {
-  const rainfallValue = Number(payload.rainfall_value);
+  const rainfallValue = parseRainfallValue(payload.rainfall_value);
   const unit = String(payload.unit || "").toLowerCase();
   const measuredAt = new Date(payload.measured_at);
 
-  if (!Number.isFinite(rainfallValue) || rainfallValue < 0) {
-    const error = new Error("Nilai curah hujan harus berupa angka nol atau lebih.");
-    error.statusCode = 400;
-    throw error;
-  }
   if (unit !== "mm") {
     const error = new Error("Satuan curah hujan harus mm.");
     error.statusCode = 400;
@@ -135,15 +141,10 @@ export async function updateRainfallReading(id, payload = {}) {
     throw error;
   }
 
-  const rawRainfallValue = payload.rainfall_value;
-  const rainfallValue = Number(rawRainfallValue);
+  const hasRainfallValue = Object.prototype.hasOwnProperty.call(payload, "rainfall_value");
+  const rainfallValue = hasRainfallValue ? parseRainfallValue(payload.rainfall_value) : undefined;
   const measuredAt = new Date(payload.measured_at);
 
-  if (rawRainfallValue === null || rawRainfallValue === undefined || String(rawRainfallValue).trim() === "" || !Number.isFinite(rainfallValue) || rainfallValue < 0) {
-    const error = new Error("Nilai curah hujan harus berupa angka nol atau lebih.");
-    error.statusCode = 400;
-    throw error;
-  }
   if (!payload.measured_at || Number.isNaN(measuredAt.getTime())) {
     const error = new Error("Tanggal dan waktu pengukuran tidak valid.");
     error.statusCode = 400;
@@ -153,9 +154,12 @@ export async function updateRainfallReading(id, payload = {}) {
   const nursery = payload.nursery ? String(payload.nursery).trim() : null;
   const bedengan = payload.bedengan === null || payload.bedengan === undefined || payload.bedengan === "" ? null : String(payload.bedengan).trim();
   const notes = payload.notes === null || payload.notes === undefined || String(payload.notes).trim() === "" ? null : String(payload.notes).trim();
+  const updatePayload = { nursery, bedengan, measured_at: measuredAt.toISOString(), notes };
+  if (hasRainfallValue) updatePayload.rainfall_value = rainfallValue;
+
   const { data, error } = await supabase
     .from("rainfall_readings")
-    .update({ nursery, bedengan, rainfall_value: rainfallValue, measured_at: measuredAt.toISOString(), notes })
+    .update(updatePayload)
     .eq("id", id)
     .select(rainfallSelect)
     .maybeSingle();

@@ -1,6 +1,7 @@
 import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp, getWitaRange } from "../utils/dateHelper.js";
 import { classifyMoisture } from "../domain/moistureClassifier.js";
+import { parseStrictFiniteNumber } from "../utils/strictNumber.js";
 
 // Mapping nama sensor ESP32 -> sensor_id di database
 // Bisa dikonfigurasi via env: SENSOR_ID_MAP={"sensor1":1,"sensor2":2,...}
@@ -19,12 +20,21 @@ export const getMoistureStatus = (moisture) => {
 
 export const validateSoilPh = (value, isPresent = true) => {
   if (!isPresent || value === null) return { valid: true, value: null };
-  if (value === "") return { valid: false, value: null };
 
-  const numericValue = Number(value);
+  const numericValue = parseStrictFiniteNumber(value);
   return {
-    valid: Number.isFinite(numericValue) && numericValue >= 0 && numericValue <= 14,
-    value: Number.isFinite(numericValue) ? numericValue : null,
+    valid: numericValue !== null && numericValue >= 0 && numericValue <= 14,
+    value: numericValue,
+  };
+};
+
+export const validateOptionalSensorMetric = (value, minimum, maximum) => {
+  if (value === null || value === undefined) return { valid: true, value: null };
+
+  const numericValue = parseStrictFiniteNumber(value);
+  return {
+    valid: numericValue !== null && numericValue >= minimum && numericValue <= maximum,
+    value: numericValue,
   };
 };
 
@@ -326,8 +336,15 @@ export async function insertSensorReadings(payload) {
     const dht11 = payload.dht11;
     const temperatureRaw = dht11?.valid ? (dht11.suhu ?? dht11.temperature ?? null) : null;
     const humidityRaw = dht11?.valid ? (dht11.kelembaban_udara ?? dht11.humidity ?? null) : null;
-    const temperature = temperatureRaw !== null && Number.isFinite(Number(temperatureRaw)) ? Number(temperatureRaw) : null;
-    const humidity = humidityRaw !== null && Number.isFinite(Number(humidityRaw)) ? Number(humidityRaw) : null;
+    const temperatureValidation = validateOptionalSensorMetric(temperatureRaw, -50, 100);
+    const humidityValidation = validateOptionalSensorMetric(humidityRaw, 0, 100);
+
+    if (!temperatureValidation.valid || !humidityValidation.valid) {
+      return { key, sensorId, success: false, error: "temperature dan humidity harus berupa angka valid dalam rentang sensor." };
+    }
+
+    const temperature = temperatureValidation.value;
+    const humidity = humidityValidation.value;
 
     // Auto-daftarkan sensor ke tabel sensors jika belum ada
     // Jika sudah ada, tidak mengubah data yang sudah ada (ignoreDuplicates: true)
