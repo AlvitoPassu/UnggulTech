@@ -39,25 +39,38 @@ const formatLastSeen = (date) => {
   return `${Math.floor(diffMinutes / 60)} jam lalu`;
 };
 
-const StatusBadge = ({ isOnline }) => (
-  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isOnline ? "bg-[#e8f7fc] text-[#1DAADF]" : "bg-red-50 text-red-700"}`}>
-    <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-[#1DAADF]" : "bg-red-500"}`} />
-    {isOnline ? "Aktif" : "Tidak Aktif"}
-  </span>
-);
+const StatusBadge = ({ isOnline, sensorHealth }) => {
+  const health = sensorHealth || (isOnline ? "online" : "offline");
+  const config = health === "online"
+    ? { label: "Aktif", bg: "bg-[#e8f7fc] text-[#1DAADF]", dot: "bg-[#1DAADF]" }
+    : health === "stale"
+      ? { label: "Stale", bg: "bg-orange-50 text-orange-700", dot: "bg-orange-500" }
+      : { label: "Offline", bg: "bg-red-50 text-red-700", dot: "bg-red-500" };
 
-const moistureConfig = {
-  Low:   { label: "Kering",  bg: "bg-orange-50",  text: "text-orange-700", dot: "bg-orange-500" },
-  Normal:{ label: "Normal",  bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
-  High:  { label: "Basah",   bg: "bg-sky-50",     text: "text-sky-700",    dot: "bg-sky-500" },
+  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${config.bg}`}>
+    <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+    {config.label}
+  </span>;
 };
 
-const MoistureBadge = ({ action }) => {
-  const cfg = moistureConfig[action] ?? { label: action ?? "-", bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400" };
+const moistureConfig = {
+  dry:    { label: "Kering", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
+  normal: { label: "Normal", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  wet:    { label: "Basah", bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
+  Low:    { label: "Kering", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
+  Normal: { label: "Normal", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  High:   { label: "Basah", bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
+};
+
+const MoistureBadge = ({ condition, action, needsAttention = false }) => {
+  const cfg = moistureConfig[condition || action] ?? { label: action ?? "Tidak tersedia", bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400" };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+        {cfg.label}
+      </span>
+      {needsAttention && <span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">Perlu Perhatian</span>}
     </span>
   );
 };
@@ -109,6 +122,8 @@ const SensorPage = () => {
   const isOnline = sensorData?.isOnline ?? false;
   const moisture = sensorData?.moisture ?? "-";
   const sensorLocation = selectedSensor?.location || "Lokasi belum tersedia";
+  const moistureCondition = moistureConfig[sensorData?.condition || sensorData?.status]?.label || "Tidak tersedia";
+  const moistureStatus = sensorData?.needsAttention ? `${moistureCondition} · Perlu Perhatian` : moistureCondition;
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
@@ -165,19 +180,19 @@ const SensorPage = () => {
                 <p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><FiMapPin aria-hidden="true" /> {sensorLocation}</p>
               </div>
             </div>
-            <StatusBadge isOnline={isOnline} />
+            <StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} />
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[minmax(230px,0.8fr)_minmax(0,2fr)]">
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
               <div><dt className="text-xs text-slate-500">Lokasi</dt><dd className="mt-1 font-medium text-slate-800">{sensorLocation}</dd></div>
               <div><dt className="text-xs text-slate-500">Jenis Tanaman</dt><dd className="mt-1 font-medium text-slate-800">Kelapa Sawit</dd></div>
-              <div><dt className="text-xs text-slate-500">Status Sensor</dt><dd className="mt-1"><StatusBadge isOnline={isOnline} /></dd></div>
+              <div><dt className="text-xs text-slate-500">Status Sensor</dt><dd className="mt-1"><StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} /></dd></div>
               <div><dt className="text-xs text-slate-500">Terakhir Update</dt><dd className="mt-1 font-medium text-slate-800">{formatLastSeen(sensorData?.lastSeen)}</dd></div>
             </dl>
 
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-              <Metric icon={FiDroplet} label="Soil Moisture" value={moisture === "-" ? "-" : `${moisture}%`} status={sensorData?.status || "Tidak tersedia"} />
+              <Metric icon={FiDroplet} label="Soil Moisture" value={moisture === "-" ? "-" : `${moisture}%`} status={moistureStatus} />
               <Metric icon={FiActivity} label="Soil pH" value={sensorData?.soilPh == null ? "-" : Number(sensorData.soilPh).toFixed(2)} status={!sensorData ? "Memuat data pH..." : sensorData?.soilPh == null ? "Data pH belum tersedia" : (sensorData.soilPh < 5 ? "Di bawah rentang target" : sensorData.soilPh > 6.5 ? "Di atas rentang target" : "Dalam rentang target")} color="text-emerald-600" />
               <Metric icon={FiThermometer} label="Temperature" value={sensorData?.temperature == null ? "-" : `${sensorData.temperature}°C`} status={sensorData?.temperature == null ? "Tidak tersedia" : "Data terbaru"} color="text-orange-500" />
               <Metric icon={WiHumidity} label="Air Humidity" value={sensorData?.humidity == null ? "-" : `${sensorData.humidity}%`} status={sensorData?.humidityStatus || "Tidak tersedia"} color="text-sky-600" />
@@ -220,7 +235,7 @@ const SensorPage = () => {
               <div className="flex flex-wrap justify-between gap-2 py-3"><dt className="text-slate-500">Tipe Sensor</dt><dd className="text-right font-medium text-slate-800">Capacitive Soil Moisture Sensor V2.0</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Interval Pengiriman</dt><dd className="font-medium text-slate-800">1 menit</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Tegangan Operasional</dt><dd className="font-medium text-slate-800">3.3V - 5.5V DC</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Status Koneksi</dt><dd><StatusBadge isOnline={isOnline} /></dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Status Koneksi</dt><dd><StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} /></dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Terakhir Update</dt><dd className="font-medium text-slate-800">{formatLastSeen(sensorData?.lastSeen)}</dd></div>
             </dl>
             <div className="mt-4 flex gap-2 rounded-md bg-[#e8f7fc] p-3 text-xs leading-5 text-[#1686b3]"><FiInfo className="mt-0.5 shrink-0" aria-hidden="true" /> Status ditentukan dari pembacaan sensor terakhir.</div>
@@ -229,7 +244,7 @@ const SensorPage = () => {
 
         <section className={`${panelClass} mt-6 overflow-hidden`}>
           <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Data Terakhir</h2><p className="mt-1 text-xs text-slate-500">Riwayat pembacaan sensor terbaru</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Soil pH</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="6" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.soil_ph == null ? "-" : Number(log.soil_ph).toFixed(2)}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge action={log.action} /></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Soil pH</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="6" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.soil_ph == null ? "-" : Number(log.soil_ph).toFixed(2)}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge condition={log.condition} action={log.action} needsAttention={log.needsAttention} /></td></tr>)}</tbody></table></div>
         </section>
 
         <section className={`${panelClass} mt-6 p-5 sm:p-6`}><div className="flex items-start gap-3"><FiAlertCircle className="mt-0.5 text-lg text-slate-400" aria-hidden="true" /><div><h2 className="text-base font-bold text-slate-900">Catatan Status</h2><p className="mt-1 text-sm text-slate-500">{isOnline ? "Sensor sedang mengirimkan pembacaan terbaru." : "Sensor tidak mengirimkan pembacaan dalam periode terakhir."}</p></div></div></section>

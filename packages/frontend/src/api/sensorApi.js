@@ -43,16 +43,27 @@ export const getNurseryMoistureTrend = async (period = "24h") => {
   return response.data;
 };
 
-const getMoistureStatus = (moisture) => {
-  if (moisture < 40) {
-    return "Low";
+const getFallbackMoistureClassification = (input) => {
+  if (input === null || input === undefined || typeof input === "boolean") {
+    return { condition: null, needsAttention: false, legacyStatus: null };
   }
 
-  if (moisture > 70) {
-    return "High";
+  let value = input;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return { condition: null, needsAttention: false, legacyStatus: null };
+    value = Number(trimmed);
+  } else if (typeof value !== "number") {
+    return { condition: null, needsAttention: false, legacyStatus: null };
   }
 
-  return "Normal";
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    return { condition: null, needsAttention: false, legacyStatus: null };
+  }
+
+  if (value <= 30) return { condition: "dry", needsAttention: true, legacyStatus: "Low" };
+  if (value <= 70) return { condition: "normal", needsAttention: false, legacyStatus: "Normal" };
+  return { condition: "wet", needsAttention: false, legacyStatus: "High" };
 };
 
 const getHumidityStatus = (humidity) => {
@@ -79,12 +90,19 @@ export const getSensorData = async (sensorId) => {
   const response = await axios.get(`/api/sensors/${sensorId}/data`);
   const data = response.data;
   const humidityValue = data.humidity === null || data.humidity === undefined ? null : Number(data.humidity);
+  const fallback = getFallbackMoistureClassification(data.moisture);
+  const hasCondition = Object.prototype.hasOwnProperty.call(data, "condition");
+  const hasNeedsAttention = Object.prototype.hasOwnProperty.call(data, "needsAttention");
 
   return {
     ...data,
     soilPh: data.soil_ph === null || data.soil_ph === undefined ? null : Number(data.soil_ph),
     humidityStatus: getHumidityStatus(humidityValue),
-    status: data.status || (data.moisture === null || data.moisture === undefined ? "Tidak tersedia" : getMoistureStatus(Number(data.moisture))),
+    status: data.status || fallback.legacyStatus || "Tidak tersedia",
+    legacyStatus: data.legacyStatus ?? fallback.legacyStatus,
+    condition: hasCondition ? data.condition : fallback.condition,
+    needsAttention: hasNeedsAttention ? data.needsAttention : fallback.needsAttention,
+    sensorHealth: data.sensorHealth || (data.isOnline ? "online" : "offline"),
   };
 };
 

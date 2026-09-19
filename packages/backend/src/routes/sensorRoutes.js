@@ -2,7 +2,8 @@ import { Router } from "express";
 import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp } from "../utils/dateHelper.js";
 import { validateSensorId } from "../utils/validators.js";
-import { getMoistureStatus, getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
+import { getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
+import { classifyMoisture } from "../domain/moistureClassifier.js";
 
 const router = Router();
 
@@ -66,15 +67,24 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
     }
 
     const logs = await getRecentLogs(sensorId);
-    const rows = logs.map((log) => ({
-      id: log.id,
-      time: formatWitaTimestamp(log[config.timestampColumn]),
-      moisture: log.moisture ?? log.soil_moisture ?? null,
-      soil_ph: log.soil_ph ?? null,
-      temperature: log.temperature ?? null,
-      humidity: log.humidity ?? null,
-      action: getMoistureStatus(log.moisture),
-    }));
+    const rows = logs.map((log) => {
+      const moisture = log.moisture ?? log.soil_moisture ?? null;
+      const classification = classifyMoisture(moisture);
+
+      return {
+        id: log.id,
+        time: formatWitaTimestamp(log[config.timestampColumn]),
+        moisture,
+        soil_ph: log.soil_ph ?? null,
+        temperature: log.temperature ?? null,
+        humidity: log.humidity ?? null,
+        action: classification.legacyStatus || "Tidak tersedia",
+        status: classification.legacyStatus || "Tidak tersedia",
+        legacyStatus: classification.legacyStatus,
+        condition: classification.condition,
+        needsAttention: classification.needsAttention,
+      };
+    });
 
     return res.json(rows);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp, getWitaRange } from "../utils/dateHelper.js";
+import { classifyMoisture } from "../domain/moistureClassifier.js";
 
 // Mapping nama sensor ESP32 -> sensor_id di database
 // Bisa dikonfigurasi via env: SENSOR_ID_MAP={"sensor1":1,"sensor2":2,...}
@@ -13,11 +14,7 @@ try {
 }
 
 export const getMoistureStatus = (moisture) => {
-  const value = Number(moisture);
-  if (!Number.isFinite(value)) return "Tidak tersedia";
-  if (value < 40) return "Low";
-  if (value > 70) return "High";
-  return "Normal";
+  return classifyMoisture(moisture).legacyStatus || "Tidak tersedia";
 };
 
 export const validateSoilPh = (value, isPresent = true) => {
@@ -125,6 +122,12 @@ export async function getSensorData(sensorId) {
       sensor: sensorResponse.data,
       latest: null,
       chart,
+      moisture: null,
+      status: null,
+      legacyStatus: null,
+      condition: null,
+      needsAttention: false,
+      sensorHealth: "offline",
       isOnline: false,
       lastSeen: null,
     };
@@ -132,10 +135,13 @@ export async function getSensorData(sensorId) {
 
   const lastSeenDate = new Date(latest.created_at);
   const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
-  const moisture = latest.moisture === null ? null : Number(latest.moisture);
+  const classification = classifyMoisture(latest.moisture);
+  const moisture = classification.value;
   const soilPh = latest.soil_ph === null || latest.soil_ph === undefined ? null : Number(latest.soil_ph);
   const temperature = latest.temperature === null ? null : Number(latest.temperature);
   const humidity = latest.humidity === null ? null : Number(latest.humidity);
+  const isOnline = minutesSinceLastReading <= 3;
+  const sensorHealth = isOnline ? "online" : "stale";
 
   return {
     sensor: sensorResponse.data,
@@ -144,7 +150,10 @@ export async function getSensorData(sensorId) {
       soil_ph: soilPh,
       temperature,
       humidity,
-      status: getMoistureStatus(moisture),
+      status: classification.legacyStatus,
+      legacyStatus: classification.legacyStatus,
+      condition: classification.condition,
+      needsAttention: classification.needsAttention,
       created_at: latest.created_at,
     },
     chart,
@@ -152,19 +161,16 @@ export async function getSensorData(sensorId) {
     soil_ph: soilPh,
     temperature,
     humidity,
-    status: getMoistureStatus(moisture),
+    status: classification.legacyStatus,
+    legacyStatus: classification.legacyStatus,
+    condition: classification.condition,
+    needsAttention: classification.needsAttention,
     sensorStatus: sensorResponse.data?.status || "Unknown",
-    isOnline: minutesSinceLastReading <= 3,
+    sensorHealth,
+    isOnline,
     lastSeen: latest.created_at,
   };
 }
-
-const getMoistureCategory = (moisture) => {
-  if (moisture === null || moisture === undefined) return "offline";
-  if (moisture < 30) return "dry";
-  if (moisture < 60) return "attention";
-  return "normal";
-};
 
 const getLatestReadings = async () => {
   const { data, error } = await supabase
@@ -195,8 +201,10 @@ export async function getNurseryOverview() {
     const latest = latestBySensor.get(sensor.id);
     const lastSeen = latest?.created_at || null;
     const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 3);
-    const moisture = latest?.moisture === null || latest?.moisture === undefined ? null : Number(latest.moisture);
+    const classification = classifyMoisture(latest?.moisture);
+    const moisture = classification.value;
     const soilPh = latest?.soil_ph === null || latest?.soil_ph === undefined ? null : Number(latest.soil_ph);
+    const sensorHealth = !lastSeen ? "offline" : isOnline ? "online" : "stale";
 
     return {
       ...sensor,
@@ -204,14 +212,17 @@ export async function getNurseryOverview() {
       soil_ph: soilPh,
       lastSeen,
       isOnline,
-      category: isOnline ? getMoistureCategory(moisture) : "offline",
+      sensorHealth,
+      legacyStatus: classification.legacyStatus,
+      condition: classification.condition,
+      needsAttention: classification.needsAttention,
     };
   });
-  const readings = sensorRows.filter((sensor) => sensor.moisture !== null);
-  const categoryCounts = sensorRows.reduce((counts, sensor) => {
-    counts[sensor.category] += 1;
+  const readings = sensorRows.filter((sensor) => sensor.condition !== null);
+  const conditionCounts = sensorRows.reduce((counts, sensor) => {
+    if (sensor.sensorHealth === "online" && sensor.condition) counts[sensor.condition] += 1;
     return counts;
-  }, { normal: 0, attention: 0, dry: 0, offline: 0 });
+  }, { dry: 0, normal: 0, wet: 0 });
   const latestTimestamps = sensorRows.map((sensor) => sensor.lastSeen).filter(Boolean);
 
   return {
@@ -220,18 +231,18 @@ export async function getNurseryOverview() {
       totalBedengan: new Set(sensorRows.map((sensor) => sensor.bedengan).filter((value) => value !== null && value !== undefined && value !== "")).size,
       totalSensors: sensorRows.length,
       activeSensors: sensorRows.filter((sensor) => sensor.isOnline).length,
-      offlineSensors: sensorRows.filter((sensor) => sensor.category === "offline").length,
+      offlineSensors: sensorRows.filter((sensor) => sensor.sensorHealth !== "online").length,
       nonactiveSensors: sensorRows.filter((sensor) => sensor.status !== "Active").length,
       averageMoisture: readings.length ? readings.reduce((total, sensor) => total + sensor.moisture, 0) / readings.length : null,
       averageSoilPh: sensorRows.filter((sensor) => sensor.soil_ph !== null).length
         ? sensorRows.filter((sensor) => sensor.soil_ph !== null).reduce((total, sensor) => total + sensor.soil_ph, 0) / sensorRows.filter((sensor) => sensor.soil_ph !== null).length
         : null,
-      conditions: categoryCounts,
+      conditions: conditionCounts,
       lastUpdated: latestTimestamps.length ? latestTimestamps.sort().at(-1) : null,
     },
     attention: sensorRows
-      .filter((sensor) => ["dry", "attention", "offline"].includes(sensor.category))
-      .sort((first, second) => ({ dry: 0, attention: 1, offline: 2 }[first.category] - { dry: 0, attention: 1, offline: 2 }[second.category] || (first.moisture ?? 101) - (second.moisture ?? 101)))
+      .filter((sensor) => sensor.sensorHealth === "online" && sensor.needsAttention)
+      .sort((first, second) => (first.moisture ?? 101) - (second.moisture ?? 101))
       .slice(0, 5),
   };
 }
@@ -296,7 +307,12 @@ export async function insertSensorReadings(payload) {
       return { key, skipped: true, reason: "Sensor ID tidak valid" };
     }
 
-    const moisture = Number(sensorData.kelembaban ?? sensorData.moisture ?? null);
+    const moistureClassification = classifyMoisture(sensorData.kelembaban ?? sensorData.moisture);
+    if (moistureClassification.value === null) {
+      return { key, sensorId, success: false, error: "moisture harus berupa angka dalam rentang 0-100." };
+    }
+
+    const moisture = moistureClassification.value;
     const hasSoilPh = Object.prototype.hasOwnProperty.call(sensorData, "soil_ph") || Object.prototype.hasOwnProperty.call(sensorData, "ph");
     const soilPhRaw = sensorData.soil_ph ?? sensorData.ph ?? null;
     const soilPhValidation = validateSoilPh(soilPhRaw, hasSoilPh);

@@ -2,14 +2,7 @@ import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 import { config } from "../config/supabase.js";
 import { formatWitaTimestamp, witaDateFormatter } from "../utils/dateHelper.js";
-
-const getMoistureStatus = (moisture) => {
-  const value = Number(moisture);
-  if (!Number.isFinite(value)) return "Tidak tersedia";
-  if (value < 40) return "Low";
-  if (value > 70) return "High";
-  return "Normal";
-};
+import { classifyMoisture } from "../domain/moistureClassifier.js";
 
 const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 const reportColumns = [
@@ -64,18 +57,26 @@ export const makeFilename = (sensorId, startDate, endDate, format) =>
   `monitoring_data_${startDate}${startDate !== endDate ? `_to_${endDate}` : ""}.${format}`;
 
 export function reportRows(logs) {
-  return logs.map((log, index) => ({
-    number: index + 1,
-    timestamp: formatWitaTimestamp(log[config.timestampColumn]),
-    sensor: getSensorLabel(log),
-    bedengan: getBedenganLabel(log),
-    moisture: numericValue(getLogValue(log, ["moisture", "soil_moisture"])),
-    ph: numericValue(getLogValue(log, ["soil_ph", "ph", "pH"])),
-    temperature: numericValue(log.temperature),
-    humidity: numericValue(log.humidity),
-    status: log[config.statusColumn] ?? getMoistureStatus(log.moisture ?? log.soil_moisture),
-    pump: log.pump ?? log.pump_status ?? "-",
-  }));
+  return logs.map((log, index) => {
+    const rawMoisture = getLogValue(log, ["moisture", "soil_moisture"]);
+    const classification = classifyMoisture(rawMoisture);
+
+    return {
+      number: index + 1,
+      timestamp: formatWitaTimestamp(log[config.timestampColumn]),
+      sensor: getSensorLabel(log),
+      bedengan: getBedenganLabel(log),
+      moisture: numericValue(rawMoisture),
+      ph: numericValue(getLogValue(log, ["soil_ph", "ph", "pH"])),
+      temperature: numericValue(log.temperature),
+      humidity: numericValue(log.humidity),
+      status: classification.legacyStatus,
+      condition: classification.condition,
+      needsAttention: classification.needsAttention,
+      sourceStatus: log[config.statusColumn] ?? null,
+      pump: log.pump ?? log.pump_status ?? "-",
+    };
+  });
 }
 
 export function sendCsv(res, rows) {

@@ -1,5 +1,6 @@
 import { supabase, config } from "../config/supabase.js";
 import { getWitaRange } from "../utils/dateHelper.js";
+import { classifyMoisture } from "../domain/moistureClassifier.js";
 
 const getDateRange = ({ startDate, endDate }) => {
   if (!startDate && !endDate) return {};
@@ -11,17 +12,6 @@ const getDateRange = ({ startDate, endDate }) => {
 };
 
 const sourceHasCanonicalStatus = config.logsTable === "sensor_logs";
-
-const getCanonicalStatus = (moisture) => {
-  if (typeof moisture !== "number" && typeof moisture !== "string") return null;
-  if (typeof moisture === "string" && moisture.trim() === "") return null;
-
-  const value = Number(moisture);
-  if (!Number.isFinite(value)) return null;
-  if (value < 40) return "Low";
-  if (value > 70) return "High";
-  return "Normal";
-};
 
 async function resolveSensorIds(bedengan) {
   if (bedengan === undefined) return null;
@@ -82,11 +72,18 @@ export async function getHistoricalReadings(filters) {
   const total = count ?? 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / filters.limit);
   return {
-    readings: (data ?? []).map(({ sensors, ...reading }) => ({
-      ...reading,
-      sensor: sensors,
-      status: sourceHasCanonicalStatus ? reading.status : getCanonicalStatus(reading.moisture),
-    })),
+    readings: (data ?? []).map(({ sensors, status: sourceStatus, ...reading }) => {
+      const classification = classifyMoisture(reading.moisture);
+
+      return {
+        ...reading,
+        sensor: sensors,
+        status: classification.legacyStatus,
+        condition: classification.condition,
+        needsAttention: classification.needsAttention,
+        sourceStatus: sourceHasCanonicalStatus ? sourceStatus ?? null : null,
+      };
+    }),
     pagination: {
       page: filters.page,
       limit: filters.limit,
