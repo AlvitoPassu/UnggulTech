@@ -41,9 +41,9 @@ create table if not exists public.sensor_readings (
   created_at timestamptz not null default timezone('utc', now()),
   status text generated always as (
     case
-      when moisture < 40 then 'Low'
-      when moisture > 70 then 'High'
-      else 'Normal'
+      when moisture <= 30 then 'Low'
+      when moisture <= 70 then 'Normal'
+      else 'High'
     end
   ) stored
 );

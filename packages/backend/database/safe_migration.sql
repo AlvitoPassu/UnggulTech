@@ -379,9 +379,9 @@ select
   sr.temperature,
   sr.humidity,
   case
-    when sr.moisture < 40 then 'Low'
-    when sr.moisture > 70 then 'High'
-    else 'Normal'
+    when sr.moisture <= 30 then 'Low'
+    when sr.moisture <= 70 then 'Normal'
+    else 'High'
   end as status,
   sr.pump_status as pump,
   sr.created_at
