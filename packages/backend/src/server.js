@@ -7,6 +7,7 @@ import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
 import rainfallRoutes from "./routes/rainfallRoutes.js";
+import recommendationRoutes from "./routes/recommendationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 
 if (!process.env.GEMINI_API_KEY) {
@@ -28,6 +29,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/historical-readings", historicalRoutes);
 app.use("/api/rainfall", rainfallRoutes);
+app.use("/api/recommendation", recommendationRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/auth", authRoutes);
 
