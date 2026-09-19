@@ -183,7 +183,7 @@ create table if not exists public.rainfall_readings (
   nursery text,
   bedengan text,
   rainfall_value numeric(8,2) not null check (rainfall_value >= 0),
-  unit text not null default 'ml' check (unit = 'ml'),
+  unit text not null default 'mm' check (unit = 'mm'),
   measured_at timestamptz not null default timezone('utc', now()),
   source text not null default 'ombrometer' check (source in ('ombrometer', 'manual')),
   notes text,
@@ -206,14 +206,14 @@ alter table public.rainfall_readings
 update public.rainfall_readings
 set
   rainfall_value = coalesce(rainfall_value, rainfall_mm),
-  unit = coalesce(nullif(trim(unit), ''), 'ml'),
+  unit = coalesce(nullif(trim(unit), ''), 'mm'),
   measured_at = coalesce(measured_at, created_at, timezone('utc', now())),
   source = case when source in ('ombrometer', 'manual') then source else 'ombrometer' end,
   created_at = coalesce(created_at, timezone('utc', now())),
   updated_at = coalesce(updated_at, timezone('utc', now()));
 
 alter table public.rainfall_readings
-  alter column unit set default 'ml',
+  alter column unit set default 'mm',
   alter column measured_at set default timezone('utc', now()),
   alter column source set default 'ombrometer',
   alter column created_at set default timezone('utc', now()),
@@ -248,7 +248,7 @@ begin
   ) then
     alter table public.rainfall_readings
       add constraint rainfall_readings_unit_check
-      check (unit = 'ml') not valid;
+      check (unit = 'mm') not valid;
   end if;
 end $$;
 

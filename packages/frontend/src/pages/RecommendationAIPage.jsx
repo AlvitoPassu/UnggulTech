@@ -522,7 +522,7 @@ const RecommendationAIPage = () => {
     try {
       const result = await createRainfallReading({
         rainfall_value: inputValue,
-        unit: "ml",
+        unit: "mm",
         measured_at: measuredAt.toISOString(),
         nursery: rainfallForm.nursery || null,
         bedengan: rainfallForm.bedengan || null,
@@ -686,7 +686,7 @@ const RecommendationAIPage = () => {
           <form onSubmit={handleRainfallSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="text-sm font-medium text-slate-700">Nursery<select value={rainfallForm.nursery} onChange={(event) => setRainfallForm((current) => ({ ...current, nursery: event.target.value, bedengan: "" }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua nursery</option>{nurseryOptions.map((nursery) => <option key={nursery} value={nursery}>{nursery}</option>)}</select></label>
             <label className="text-sm font-medium text-slate-700">Bedengan<select value={rainfallForm.bedengan} onChange={(event) => setRainfallForm((current) => ({ ...current, bedengan: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua bedengan</option>{bedenganOptions.map((bedengan) => <option key={bedengan} value={bedengan}>Bedengan {bedengan}</option>)}</select></label>
-            <label className="text-sm font-medium text-slate-700">Curah Hujan<input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">Satuan: ml</span></label>
+            <label className="text-sm font-medium text-slate-700">Curah Hujan<input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">Satuan: mm</span></label>
             <label className="text-sm font-medium text-slate-700">Tanggal Pengukuran<input required type="date" value={rainfallForm.measured_date} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_date: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
             <label className="text-sm font-medium text-slate-700">Waktu Pengukuran<input required type="time" value={rainfallForm.measured_time} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_time: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
             <label className="text-sm font-medium text-slate-700 md:col-span-2">Catatan opsional<textarea value={rainfallForm.notes} onChange={(event) => setRainfallForm((current) => ({ ...current, notes: event.target.value }))} rows="2" className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
@@ -744,8 +744,8 @@ const RecommendationAIPage = () => {
               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${toneClasses[rainfallFreshnessMeta.tone]}`}>{rainfallFreshnessMeta.label}</span>
             </div>
             <p className="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">Curah Hujan</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} ml` : "-"}</p>
-            <p className="mt-3 text-[11px] text-slate-500">Threshold SOP: 10 ml</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} mm` : "-"}</p>
+            <p className="mt-3 text-[11px] text-slate-500">Threshold SOP: 10 mm</p>
             <p className="mt-1 text-[11px] text-slate-500">Status: {rainfallMeta.label}</p>
             <p className="mt-1 text-[11px] text-slate-500">Validitas data: {rainfallFreshnessMeta.description}</p>
             {rainfallReading?.measured_at && <p className="mt-1 text-[11px] text-slate-500">Diukur: {formatWita(rainfallReading.measured_at, { dateStyle: "medium", timeStyle: "short" })} WITA</p>}
@@ -886,7 +886,7 @@ const RecommendationAIPage = () => {
                 <ul className="space-y-2">
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Kelembaban Tanah</span><strong>{moistureValue === null || Number.isNaN(moistureValue) ? "-" : `${Math.round(moistureValue)}%`}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>pH Tanah</span><strong>{phValue === null || Number.isNaN(phValue) ? "Data belum tersedia" : phValue.toFixed(2)}</strong></li>
-                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Curah Hujan</span><strong>{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} ml` : "Data belum tersedia"}</strong></li>
+                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Curah Hujan</span><strong>{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} mm` : "Data belum tersedia"}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Probabilitas Hujan</span><strong>{nextForecast?.humidity ? `${nextForecast.humidity}%` : "Data tidak tersedia"}</strong></li>
                 </ul>
               </div>
@@ -963,7 +963,7 @@ const RecommendationAIPage = () => {
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
-                  <Tooltip formatter={(value) => [`${value} ml`, "Curah Hujan"]} />
+                  <Tooltip formatter={(value) => [`${value} mm`, "Curah Hujan"]} />
                   <Line type="monotone" dataKey="rainfall_value" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -1002,7 +1002,7 @@ const RecommendationAIPage = () => {
                       <td className="px-5 py-3">{item.location || "-"}</td>
                       <td className="px-5 py-3">{item.moisture == null || Number.isNaN(Number(item.moisture)) ? "-" : `${Math.round(Number(item.moisture))}%`}</td>
                       <td className="px-5 py-3">{item.ph == null ? "-" : Number(item.ph).toFixed(1)}</td>
-                      <td className="px-5 py-3">{item.rainfall == null ? "-" : `${Number(item.rainfall).toFixed(1)} ml`}</td>
+                      <td className="px-5 py-3">{item.rainfall == null ? "-" : `${Number(item.rainfall).toFixed(1)} mm`}</td>
                       <td className="px-5 py-3">{item.recommendation || "-"}</td>
                       <td className="px-5 py-3">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${toneClasses[item.status === "NORMAL" ? "normal" : item.status === "TINDAKAN DIPERLUKAN" ? "critical" : "attention"]}`}>
@@ -1035,15 +1035,15 @@ const RecommendationAIPage = () => {
                   <ul className="mt-2 space-y-2 text-sm text-slate-700">
                     <li>Kelembaban tanah: {detailOpen.moisture == null ? "Data belum tersedia" : `${Math.round(Number(detailOpen.moisture))}%`}</li>
                     <li>pH tanah: {detailOpen.ph == null ? "Data belum tersedia" : Number(detailOpen.ph).toFixed(1)}</li>
-                    <li>Curah hujan: {detailOpen.rainfall == null ? "Data belum tersedia" : `${Number(detailOpen.rainfall).toFixed(1)} ml`}</li>
+                    <li>Curah hujan: {detailOpen.rainfall == null ? "Data belum tersedia" : `${Number(detailOpen.rainfall).toFixed(1)} mm`}</li>
                   </ul>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Rule yang digunakan</p>
                   <ul className="mt-2 space-y-2 text-sm text-slate-700">
                     <li>• Penyiraman pagi dan sore sesuai SOP.</li>
-                    <li>• Curah hujan di bawah 10 ml memicu penyiraman.</li>
-                    <li>• Curah hujan 10 ml atau lebih meniadakan kebutuhan penyiraman.</li>
+                    <li>• Curah hujan di bawah 10 mm memicu penyiraman.</li>
+                    <li>• Curah hujan 10 mm atau lebih meniadakan kebutuhan penyiraman.</li>
                   </ul>
                 </div>
               </div>

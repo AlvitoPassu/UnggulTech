@@ -3,6 +3,8 @@ import { witaDateFormatter } from "../utils/dateHelper.js";
 
 const rainfallSelect = "id, nursery, bedengan, rainfall_value, unit, measured_at, source, notes, created_at";
 
+const withMillimeterUnit = (reading) => (reading ? { ...reading, unit: "mm" } : reading);
+
 const applyLocationFilters = (query, { nursery, bedengan } = {}) => {
   let filteredQuery = query;
   if (nursery) filteredQuery = filteredQuery.eq("nursery", nursery);
@@ -39,7 +41,7 @@ export async function getLatestRainfall(filters = {}) {
   query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
-  return { available: Boolean(data), reading: data, ...getRainfallFreshness(data) };
+  return { available: Boolean(data), reading: withMillimeterUnit(data), ...getRainfallFreshness(data) };
 }
 
 export async function getRainfallHistory(filters = {}) {
@@ -54,7 +56,7 @@ export async function getRainfallHistory(filters = {}) {
   query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(withMillimeterUnit);
 }
 
 export async function getRainfallTrend(period = "7d", filters = {}) {
@@ -89,7 +91,7 @@ export async function getRainfallTrend(period = "7d", filters = {}) {
     timestamp,
     label: new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Makassar", day: "2-digit", month: "short", ...(validPeriod === "1d" ? { hour: "2-digit" } : {}) }).format(new Date(timestamp)),
     rainfall_value: Number((bucket.total / bucket.count).toFixed(2)),
-    unit: "ml",
+    unit: "mm",
   }));
 }
 
@@ -103,8 +105,8 @@ export async function createRainfallReading(payload = {}) {
     error.statusCode = 400;
     throw error;
   }
-  if (unit !== "ml") {
-    const error = new Error("Satuan curah hujan harus ml.");
+  if (unit !== "mm") {
+    const error = new Error("Satuan curah hujan harus mm.");
     error.statusCode = 400;
     throw error;
   }
@@ -118,12 +120,12 @@ export async function createRainfallReading(payload = {}) {
   const bedengan = payload.bedengan === null || payload.bedengan === undefined || payload.bedengan === "" ? null : String(payload.bedengan).trim();
   const { data, error } = await supabase
     .from("rainfall_readings")
-    .insert({ nursery, bedengan, rainfall_value: rainfallValue, unit: "ml", measured_at: measuredAt.toISOString(), source: "ombrometer", notes: payload.notes ? String(payload.notes).trim() : null })
+    .insert({ nursery, bedengan, rainfall_value: rainfallValue, unit: "mm", measured_at: measuredAt.toISOString(), source: "ombrometer", notes: payload.notes ? String(payload.notes).trim() : null })
     .select(rainfallSelect)
     .single();
 
   if (error) throw error;
-  return data;
+  return withMillimeterUnit(data);
 }
 
 export async function updateRainfallReading(id, payload = {}) {
@@ -164,5 +166,5 @@ export async function updateRainfallReading(id, payload = {}) {
     notFoundError.statusCode = 404;
     throw notFoundError;
   }
-  return data;
+  return withMillimeterUnit(data);
 }

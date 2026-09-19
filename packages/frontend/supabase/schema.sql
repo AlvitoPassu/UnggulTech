@@ -53,7 +53,7 @@ create table if not exists public.rainfall_readings (
   nursery text,
   bedengan text,
   rainfall_value numeric(8,2) not null check (rainfall_value >= 0),
-  unit text not null default 'ml' check (unit = 'ml'),
+  unit text not null default 'mm' check (unit = 'mm'),
   measured_at timestamptz not null default timezone('utc', now()),
   source text not null default 'ombrometer' check (source in ('ombrometer', 'manual')),
   notes text,
