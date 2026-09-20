@@ -47,9 +47,9 @@ const ChatbotAssistant = () => {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-[calc(4rem+1rem+env(safe-area-inset-bottom))] right-4 z-40 lg:bottom-6 lg:right-6">
       {isOpen && (
-        <section className="mb-3 flex h-[min(680px,calc(100dvh-120px))] w-[calc(100vw-2.5rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10" aria-label="Unggul AI Assistant">
+        <section className="mb-3 flex h-[min(680px,calc(100dvh-120px))] w-[calc(100vw-2.5rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 max-lg:h-[min(680px,calc(100dvh-180px-env(safe-area-inset-bottom)))]" aria-label="Unggul AI Assistant">
           <header className="flex items-start justify-between bg-[#1DAADF] px-4 py-3 text-white">
             <div className="flex gap-2.5"><FiMessageCircle className="mt-0.5 text-xl" aria-hidden="true" /><div><h2 className="text-sm font-bold">Unggul AI Assistant</h2><p className="text-xs text-white/85">Siap membantu dengan data nursery Anda</p></div></div>
             <button type="button" onClick={() => setIsOpen(false)} className="rounded-md p-1 transition hover:bg-white/15" aria-label="Tutup chatbot"><FiX className="text-lg" /></button>

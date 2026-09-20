@@ -126,34 +126,34 @@ const SensorPage = () => {
   const moistureStatus = sensorData?.needsAttention ? `${moistureCondition} · Perlu Perhatian` : moistureCondition;
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
+    <div className="min-h-screen bg-[#F5F6F8] text-slate-800">
+      <header className="sticky top-0 z-30 h-16 border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1DAADF] text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white">
               <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Smart Soil Monitoring System</p>
-              <p className="mt-0.5 text-xs text-slate-500">Monitoring detail sensor</p>
+              <p className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">Smart Soil Monitoring System</p>
+              <p className="mt-0.5 truncate text-xs text-white/80">Monitoring detail sensor</p>
             </div>
           </div>
 
-          <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-            <div className="hidden items-center gap-2 text-right sm:flex">
+          <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+            <div className="hidden items-center gap-2 text-right lg:flex">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p>
-                <p className="text-xs font-semibold text-slate-700">{formatLastSeen(sensorData?.lastSeen)}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Terakhir diperbarui</p>
+                <p className="text-xs font-semibold text-white">{formatLastSeen(sensorData?.lastSeen)}</p>
               </div>
-              <FiRefreshCw className="text-slate-500" aria-hidden="true" />
+              <FiRefreshCw className="text-white" aria-hidden="true" />
             </div>
             <div>
-              <label htmlFor="sensor-page-selector" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Pilih Bedengan</label>
+              <label htmlFor="sensor-page-selector" className="sr-only">Pilih Bedengan</label>
               <select
                 id="sensor-page-selector"
                 value={selectedSensorId}
                 onChange={(event) => setSelectedSensorId(event.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa] sm:min-w-44"
+                className="w-28 rounded-md border border-white/40 bg-white px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:border-white focus:ring-2 focus:ring-white/40 sm:w-auto sm:min-w-44 sm:px-3"
               >
                 {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
               </select>

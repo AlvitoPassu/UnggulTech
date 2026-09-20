@@ -537,29 +537,29 @@ const RecommendationAIPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex min-h-[92px] max-w-[1440px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
+    <div className="min-h-screen bg-[#F5F6F8] text-slate-800">
+      <header className="sticky top-0 z-30 h-16 border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1DAADF] text-white shadow-sm">
-              <FiCpu className="text-xl" aria-hidden="true" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white">
+              <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight text-slate-900 sm:text-base">Unggul Monitoring</p>
-              <p className="mt-0.5 text-xs text-slate-500">Rekomendasi tindakan berbasis data dan SOP operasional</p>
+              <p className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">Unggul Monitoring</p>
+              <p className="mt-0.5 truncate text-xs text-white/80">Rekomendasi tindakan berbasis data dan SOP operasional</p>
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-3 sm:gap-5">
+          <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-2 text-right">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Terakhir diperbarui</p>
-                <p className="text-xs font-semibold text-slate-700">{loading ? "Memuat data..." : formatWita(lastUpdated || new Date(), { dateStyle: "medium", timeStyle: "short" })}</p>
+              <div className="hidden md:block">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Terakhir diperbarui</p>
+                <p className="text-xs font-semibold text-white">{loading ? "Memuat data..." : formatWita(lastUpdated || new Date(), { dateStyle: "medium", timeStyle: "short" })}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setRefreshToken((value) => value + 1)}
-                className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-[#1DAADF]"
+                className="rounded-md p-2 text-white transition hover:bg-white/15"
                 aria-label="Refresh rekomendasi"
               >
                 <FiRefreshCw className={loading ? "animate-spin" : ""} aria-hidden="true" />
@@ -575,9 +575,6 @@ const RecommendationAIPage = () => {
           <div>
             <p className="mb-1 text-sm font-medium text-[#1DAADF]">Analisis / Tindakan</p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Rekomendasi AI</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Rekomendasi tindakan ditentukan oleh aturan operasional berbasis data kelembaban tanah dan curah hujan aktual. Prakiraan cuaca hanya menjadi informasi tambahan.
-            </p>
           </div>
         </div>
 
