@@ -65,7 +65,10 @@ const DashboardPage = () => {
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-2 text-right">
-              <div className="hidden md:block"><p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Terakhir diperbarui</p><p className="text-xs font-semibold text-white">{isLoading ? "Memuat data..." : formattedLastUpdated}</p></div>
+              <div>
+                <p className="hidden sm:block text-[11px] font-medium uppercase tracking-wide text-white/70">Terakhir diperbarui</p>
+                <p className="text-xs font-semibold text-white">{isLoading ? "Memuat..." : formattedLastUpdated}</p>
+              </div>
               <button type="button" onClick={() => setRefreshToken((value) => value + 1)} className="rounded-md p-2 text-white transition hover:bg-white/15" aria-label="Refresh data"><FiRefreshCw aria-hidden="true" /></button>
             </div>
             <HeaderAuthStatus />
