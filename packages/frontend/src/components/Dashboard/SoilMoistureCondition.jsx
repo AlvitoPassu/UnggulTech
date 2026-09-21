@@ -1,9 +1,9 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 const categories = [
-  { key: "dry", label: "Kering", description: "0% - 30%", color: "#dc3d3d" },
-  { key: "normal", label: "Normal", description: "> 30% - 70%", color: "#1DAADF" },
-  { key: "wet", label: "Basah", description: "> 70% - 100%", color: "#38bdf8" },
+  { key: "dry",    label: "Kering", description: "0% - 30%",     color: "#ef4444" },
+  { key: "normal", label: "Normal", description: "> 30% - 70%",  color: "#22c55e" },
+  { key: "wet",    label: "Basah",  description: "> 70% - 100%", color: "#1DAADF" },
 ];
 
 const SoilMoistureCondition = ({ conditions }) => {
