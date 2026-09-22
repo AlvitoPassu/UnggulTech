@@ -105,9 +105,6 @@ const AppLayout = () => {
       </div>
     </aside>
 
-<<<<<<< HEAD
-    {/* Toggle button desktop */}
-=======
     {isLogoutConfirmationOpen && (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
@@ -162,7 +159,7 @@ const AppLayout = () => {
       </div>
     )}
 
->>>>>>> 7a2f064e (feat: menambahkan button login dan logout)
+    {/* Toggle button desktop */}
     <button
       type="button"
       onClick={() => setIsSidebarOpen((isOpen) => !isOpen)}
@@ -188,7 +185,7 @@ const AppLayout = () => {
             `flex flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 transition ${isActive ? "bg-[#e8f7fc] text-[#1DAADF]" : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"}`
           }
         >
-          {({ isActive }) => (
+          {() => (
             <>
               <Icon className="text-xl" aria-hidden="true" />
               <span className="text-center text-[10px] font-semibold leading-tight">
@@ -198,6 +195,16 @@ const AppLayout = () => {
           )}
         </NavLink>
       ))}
+      <button
+        type="button"
+        onClick={handleAuthenticationAction}
+        className="flex flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+      >
+        <AuthIcon className="text-xl" aria-hidden="true" />
+        <span className="text-center text-[10px] font-semibold leading-tight">
+          {isAuthenticated ? "Logout" : "Login"}
+        </span>
+      </button>
     </nav>
 
     {/* Main content */}
