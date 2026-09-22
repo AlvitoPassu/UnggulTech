@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { FiEye, FiEyeOff, FiLock, FiAlertCircle } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 
@@ -16,7 +16,7 @@ const LoginModal = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!identifier.trim() || !password) {
-      setErrorMessage("Silakan isi username/email dan password.");
+      setErrorMessage("Silakan isi username dan password.");
       return;
     }
 
@@ -29,8 +29,8 @@ const LoginModal = () => {
       setIdentifier("");
       setPassword("");
       setErrorMessage("");
-    } catch (err) {
-      setErrorMessage(err.message || "Gagal masuk. Periksa username dan password Anda.");
+    } catch {
+      setErrorMessage("Username atau password tidak valid.");
     } finally {
       setIsLoading(false);
     }
@@ -38,6 +38,9 @@ const LoginModal = () => {
 
   const handleClose = () => {
     if (isLoading) return;
+    setIdentifier("");
+    setPassword("");
+    setShowPassword(false);
     setErrorMessage("");
     closeLoginModal();
   };
@@ -59,10 +62,10 @@ const LoginModal = () => {
           </div>
           <div>
             <h2 id="login-modal-title" className="text-xl font-bold tracking-tight text-slate-900">
-              Akses Terbatas
+              Login
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Tindakan ini membutuhkan akun operator yang memiliki hak akses.
+              Masuk menggunakan akun operator Anda.
             </p>
           </div>
         </div>
@@ -80,16 +83,17 @@ const LoginModal = () => {
               htmlFor="operator-identifier"
               className="mb-1.5 block text-xs font-semibold text-slate-700"
             >
-              Username atau Email
+              Username
             </label>
             <input
               id="operator-identifier"
               type="text"
               required
               autoFocus
+              autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Masukkan username atau email"
+              placeholder="Masukkan username"
               disabled={isLoading}
               className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#1DAADF] focus:ring-2 focus:ring-[#a3e1f5] disabled:cursor-not-allowed disabled:bg-slate-50"
             />
@@ -107,6 +111,7 @@ const LoginModal = () => {
                 id="operator-password"
                 type={showPassword ? "text" : "password"}
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan password"
@@ -118,7 +123,6 @@ const LoginModal = () => {
                 onClick={() => setShowPassword((prev) => !prev)}
                 className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none"
                 aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-                tabIndex={-1}
               >
                 {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
               </button>
@@ -139,7 +143,7 @@ const LoginModal = () => {
               disabled={isLoading}
               className="inline-flex items-center justify-center rounded-lg bg-[#1DAADF] px-5 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-[#1686b3] focus:ring-2 focus:ring-[#a3e1f5] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLoading ? "Memproses..." : "Masuk"}
+              {isLoading ? "Memproses..." : "Login"}
             </button>
           </div>
         </form>

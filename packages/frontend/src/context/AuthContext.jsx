@@ -180,6 +180,15 @@ export const AuthProvider = ({ children }) => {
     const currentToken = session?.access_token;
     const currentSessionId = sessionId;
 
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+
     clearSessionState("unauthenticated");
     setSessionNotice("");
 
@@ -197,14 +206,10 @@ export const AuthProvider = ({ children }) => {
         );
       }
     } catch {
-      // ignore
+      // Pencatatan logout tidak boleh membatalkan logout Supabase yang sudah berhasil.
     }
 
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // ignore
-    }
+    return true;
   }, [clearSessionState, session, sessionId]);
 
   // Protected Action Wrapper: Checks login; if unauthenticated, opens modal and queues action
