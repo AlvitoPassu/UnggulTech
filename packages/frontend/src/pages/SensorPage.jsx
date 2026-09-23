@@ -210,7 +210,7 @@ const SensorPage = () => {
             {sensorData?.chart?.length ? (
               <div className="h-[290px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sensorData.chart} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}>
+                  <LineChart data={sensorData.chart} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
                     <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} />
