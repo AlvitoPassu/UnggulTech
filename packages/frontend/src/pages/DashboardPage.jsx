@@ -57,8 +57,8 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-[#F5F6F8] text-slate-800">
-      <header className="sticky top-0 z-30 h-16 border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
+      <header className="sticky top-0 z-30 h-[73px] border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
+        <div className="mx-auto flex h-[73px] max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white"><img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" /></div>
             <div className="min-w-0"><p className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">Smart Soil Monitoring System</p><p className="mt-0.5 truncate text-xs text-white/80">Overview operasional nursery</p></div>
