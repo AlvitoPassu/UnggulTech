@@ -22,6 +22,8 @@ import { WiHumidity } from "react-icons/wi";
 import {
   getRecentLogs,
   getSensorData,
+  getGlobalSoilPh,
+  getGlobalSoilPhHistory,
   getSensors,
   getSensorDisplayName,
 } from "../api/sensorApi";
@@ -91,6 +93,8 @@ const SensorPage = () => {
   const [selectedSensorId, setSelectedSensorId] = useState("");
   const [sensorData, setSensorData] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
+  const [globalSoilPh, setGlobalSoilPh] = useState(null);
+  const [globalSoilPhHistory, setGlobalSoilPhHistory] = useState([]);
 
   useEffect(() => {
     const fetchSensors = () => {
@@ -108,9 +112,17 @@ const SensorPage = () => {
   useEffect(() => {
     if (!selectedSensorId) return;
 
-    const fetchData = () => {
-      getSensorData(selectedSensorId).then(setSensorData);
-      getRecentLogs(selectedSensorId).then(setRecentLogs);
+    const fetchData = async () => {
+      const [nextSensorData, nextRecentLogs, nextSoilPh, nextSoilPhHistory] = await Promise.all([
+        getSensorData(selectedSensorId),
+        getRecentLogs(selectedSensorId),
+        getGlobalSoilPh(),
+        getGlobalSoilPhHistory(),
+      ]);
+      setSensorData(nextSensorData);
+      setRecentLogs(nextRecentLogs);
+      setGlobalSoilPh(nextSoilPh);
+      setGlobalSoilPhHistory(nextSoilPhHistory);
     };
 
     fetchData();
@@ -122,6 +134,19 @@ const SensorPage = () => {
   const isOnline = sensorData?.isOnline ?? false;
   const moisture = sensorData?.moisture ?? "-";
   const sensorLocation = selectedSensor?.location || "Lokasi belum tersedia";
+  const soilPhValue = globalSoilPh?.soilPh ?? null;
+  const soilPhStatus = globalSoilPh?.status === "active"
+    ? "Aktif"
+    : globalSoilPh?.status === "inactive"
+      ? "Tidak Aktif"
+      : "Belum Ada Data";
+  const soilPhDetail = soilPhValue === null
+    ? soilPhStatus
+    : `${soilPhStatus} · ${formatLastSeen(globalSoilPh?.measuredAt)}`;
+  const soilPhChart = globalSoilPhHistory.map((reading) => ({
+    soilPh: reading.soilPh,
+    time: new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(new Date(reading.measuredAt)),
+  }));
   const moistureCondition = moistureConfig[sensorData?.condition || sensorData?.status]?.label || "Tidak tersedia";
   const moistureStatus = sensorData?.needsAttention ? `${moistureCondition} · Perlu Perhatian` : moistureCondition;
 
@@ -193,7 +218,7 @@ const SensorPage = () => {
 
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <Metric icon={FiDroplet} label="Soil Moisture" value={moisture === "-" ? "-" : `${moisture}%`} status={moistureStatus} />
-              <Metric icon={FiActivity} label="Soil pH" value={sensorData?.soilPh == null ? "-" : Number(sensorData.soilPh).toFixed(2)} status={!sensorData ? "Memuat data pH..." : sensorData?.soilPh == null ? "Data pH belum tersedia" : (sensorData.soilPh < 5 ? "Di bawah rentang target" : sensorData.soilPh > 6.5 ? "Di atas rentang target" : "Dalam rentang target")} color="text-emerald-600" />
+              <Metric icon={FiActivity} label="Soil pH Global" value={soilPhValue == null ? "-" : Number(soilPhValue).toFixed(2)} status={soilPhDetail} color="text-emerald-600" />
               <Metric icon={FiThermometer} label="Temperature" value={sensorData?.temperature == null ? "-" : `${sensorData.temperature}°C`} status={sensorData?.temperature == null ? "Tidak tersedia" : "Data terbaru"} color="text-orange-500" />
               <Metric icon={WiHumidity} label="Air Humidity" value={sensorData?.humidity == null ? "-" : `${sensorData.humidity}%`} status={sensorData?.humidityStatus || "Tidak tersedia"} color="text-sky-600" />
               <Metric icon={FiBattery} label="Voltage" value="-" status="Tidak tersedia" color="text-violet-500" />
@@ -223,9 +248,9 @@ const SensorPage = () => {
           </section>
 
           <section className={`${panelClass} p-5 sm:p-6 xl:col-span-2`}>
-            <div className="mb-5"><h2 className="text-base font-bold text-slate-900">Grafik Soil pH</h2><p className="mt-1 text-xs text-slate-500">Data pH aktual dari pembacaan sensor</p></div>
-            {sensorData?.chart?.some((reading) => reading.soil_ph !== null && reading.soil_ph !== undefined) ? (
-              <div className="h-[290px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={sensorData.chart} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}><CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} /><Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} /><Line type="monotone" dataKey="soil_ph" name="Soil pH" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} /></LineChart></ResponsiveContainer></div>
+            <div className="mb-5"><h2 className="text-base font-bold text-slate-900">Grafik Soil pH Global</h2><p className="mt-1 text-xs text-slate-500">Satu series dari satu sensor pH untuk seluruh bedengan</p></div>
+            {soilPhChart.length ? (
+              <div className="h-[290px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={soilPhChart} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}><CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} /><Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} /><Line type="monotone" dataKey="soilPh" name="Soil pH Global" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} /></LineChart></ResponsiveContainer></div>
             ) : <div className="flex h-[290px] items-center justify-center text-sm text-slate-400">Data pH belum tersedia.</div>}
           </section>
 
@@ -244,7 +269,7 @@ const SensorPage = () => {
 
         <section className={`${panelClass} mt-6 overflow-hidden`}>
           <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Data Terakhir</h2><p className="mt-1 text-xs text-slate-500">Riwayat pembacaan sensor terbaru</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Soil pH</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="6" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.soil_ph == null ? "-" : Number(log.soil_ph).toFixed(2)}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge condition={log.condition} action={log.action} needsAttention={log.needsAttention} /></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge condition={log.condition} action={log.action} needsAttention={log.needsAttention} /></td></tr>)}</tbody></table></div>
         </section>
 
         <section className={`${panelClass} mt-6 p-5 sm:p-6`}><div className="flex items-start gap-3"><FiAlertCircle className="mt-0.5 text-lg text-slate-400" aria-hidden="true" /><div><h2 className="text-base font-bold text-slate-900">Catatan Status</h2><p className="mt-1 text-sm text-slate-500">{isOnline ? "Sensor sedang mengirimkan pembacaan terbaru." : "Sensor tidak mengirimkan pembacaan dalam periode terakhir."}</p></div></div></section>

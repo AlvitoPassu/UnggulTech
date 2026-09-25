@@ -2,6 +2,7 @@ import { supabase, config } from "../config/supabase.js";
 import { formatWitaTimestamp, getWitaRange } from "../utils/dateHelper.js";
 import { classifyMoisture } from "../domain/moistureClassifier.js";
 import { parseStrictFiniteNumber } from "../utils/strictNumber.js";
+import { getLatestSoilPh } from "./soilPhService.js";
 
 // Mapping nama sensor ESP32 -> sensor_id di database
 // Bisa dikonfigurasi via env: SENSOR_ID_MAP={"sensor1":1,"sensor2":2,...}
@@ -89,14 +90,14 @@ export async function getSensorData(sensorId) {
   const [latestResponse, chartResponse, sensorResponse] = await Promise.all([
     supabase
       .from(config.logsTable)
-      .select("id, moisture, soil_ph, temperature, humidity, created_at")
+      .select("id, moisture, temperature, humidity, created_at")
       .eq("sensor_id", sensorId)
       .order(config.timestampColumn, { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
       .from(config.logsTable)
-        .select("id, moisture, soil_ph, created_at")
+        .select("id, moisture, created_at")
       .eq("sensor_id", sensorId)
       .order(config.timestampColumn, { ascending: false })
       .limit(config.recentLogsLimit),
@@ -123,7 +124,6 @@ export async function getSensorData(sensorId) {
   const chart = (chartResponse.data ?? []).reverse().map((reading) => ({
     time: formatWitaTimestamp(reading.created_at),
     moisture: reading.moisture === null ? null : Number(reading.moisture),
-    soil_ph: reading.soil_ph === null ? null : Number(reading.soil_ph),
     created_at: reading.created_at,
   }));
 
@@ -147,7 +147,6 @@ export async function getSensorData(sensorId) {
   const minutesSinceLastReading = (Date.now() - lastSeenDate.getTime()) / 1000 / 60;
   const classification = classifyMoisture(latest.moisture);
   const moisture = classification.value;
-  const soilPh = latest.soil_ph === null || latest.soil_ph === undefined ? null : Number(latest.soil_ph);
   const temperature = latest.temperature === null ? null : Number(latest.temperature);
   const humidity = latest.humidity === null ? null : Number(latest.humidity);
   const isOnline = minutesSinceLastReading <= 3;
@@ -157,7 +156,6 @@ export async function getSensorData(sensorId) {
     sensor: sensorResponse.data,
     latest: {
       moisture,
-      soil_ph: soilPh,
       temperature,
       humidity,
       status: classification.legacyStatus,
@@ -168,7 +166,6 @@ export async function getSensorData(sensorId) {
     },
     chart,
     moisture,
-    soil_ph: soilPh,
     temperature,
     humidity,
     status: classification.legacyStatus,
@@ -185,7 +182,7 @@ export async function getSensorData(sensorId) {
 const getLatestReadings = async () => {
   const { data, error } = await supabase
     .from(config.logsTable)
-    .select("sensor_id, moisture, soil_ph, created_at")
+    .select("sensor_id, moisture, created_at")
     .order(config.timestampColumn, { ascending: false })
     .limit(10000);
 
@@ -202,9 +199,10 @@ const getLatestReadings = async () => {
 };
 
 export async function getNurseryOverview() {
-  const [sensors, latestBySensor] = await Promise.all([
+  const [sensors, latestBySensor, globalSoilPh] = await Promise.all([
     getSensors(),
     getLatestReadings(),
+    getLatestSoilPh(),
   ]);
   const now = Date.now();
   const sensorRows = sensors.map((sensor) => {
@@ -213,13 +211,11 @@ export async function getNurseryOverview() {
     const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 3);
     const classification = classifyMoisture(latest?.moisture);
     const moisture = classification.value;
-    const soilPh = latest?.soil_ph === null || latest?.soil_ph === undefined ? null : Number(latest.soil_ph);
     const sensorHealth = !lastSeen ? "offline" : isOnline ? "online" : "stale";
 
     return {
       ...sensor,
       moisture,
-      soil_ph: soilPh,
       lastSeen,
       isOnline,
       sensorHealth,
@@ -244,9 +240,10 @@ export async function getNurseryOverview() {
       offlineSensors: sensorRows.filter((sensor) => sensor.sensorHealth !== "online").length,
       nonactiveSensors: sensorRows.filter((sensor) => sensor.status !== "Active").length,
       averageMoisture: readings.length ? readings.reduce((total, sensor) => total + sensor.moisture, 0) / readings.length : null,
-      averageSoilPh: sensorRows.filter((sensor) => sensor.soil_ph !== null).length
-        ? sensorRows.filter((sensor) => sensor.soil_ph !== null).reduce((total, sensor) => total + sensor.soil_ph, 0) / sensorRows.filter((sensor) => sensor.soil_ph !== null).length
-        : null,
+      soilPh: globalSoilPh.soilPh,
+      soilPhMeasuredAt: globalSoilPh.measuredAt,
+      soilPhStatus: globalSoilPh.status,
+      isSoilPhActive: globalSoilPh.isActive,
       conditions: conditionCounts,
       lastUpdated: latestTimestamps.length ? latestTimestamps.sort().at(-1) : null,
     },
@@ -323,13 +320,8 @@ export async function insertSensorReadings(payload) {
     }
 
     const moisture = moistureClassification.value;
-    const hasSoilPh = Object.prototype.hasOwnProperty.call(sensorData, "soil_ph") || Object.prototype.hasOwnProperty.call(sensorData, "ph");
-    const soilPhRaw = sensorData.soil_ph ?? sensorData.ph ?? null;
-    const soilPhValidation = validateSoilPh(soilPhRaw, hasSoilPh);
-    const soilPh = soilPhValidation.value;
-
-    if (!soilPhValidation.valid) {
-      return { key, sensorId, success: false, error: "soil_ph harus berupa angka dalam rentang 0-14." };
+    if (sensorData.status === "pH Monitor" && (Object.prototype.hasOwnProperty.call(sensorData, "soil_ph") || Object.prototype.hasOwnProperty.call(sensorData, "ph"))) {
+      return { key, sensorId, success: false, error: "soil_ph harus dikirim ke endpoint pH terpisah." };
     }
 
     // Ambil data DHT11 dari payload (berlaku untuk semua sensor dalam satu pengiriman)
@@ -364,7 +356,6 @@ export async function insertSensorReadings(payload) {
     const record = {
       sensor_id: sensorId,
       moisture: Number.isFinite(moisture) ? moisture : null,
-      soil_ph: soilPh,
       temperature,
       humidity,
     };

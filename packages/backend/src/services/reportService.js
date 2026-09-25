@@ -11,7 +11,6 @@ const reportColumns = [
   { header: "Sensor", key: "sensor", width: 18 },
   { header: "Bedengan", key: "bedengan", width: 14 },
   { header: "Soil Moisture (%)", key: "moisture", width: 20, align: "right" },
-  { header: "Soil pH", key: "ph", width: 12, align: "right" },
   { header: "Temperature (°C)", key: "temperature", width: 20, align: "right" },
   { header: "Humidity (%)", key: "humidity", width: 16, align: "right" },
   { header: "Status", key: "status", width: 16 },
@@ -48,7 +47,6 @@ const getSummary = (rows) => {
   return {
     count: rows.length,
     averageMoisture: average("moisture"),
-    averagePh: average("ph"),
     averageTemperature: average("temperature"),
   };
 };
@@ -67,7 +65,6 @@ export function reportRows(logs) {
       sensor: getSensorLabel(log),
       bedengan: getBedenganLabel(log),
       moisture: numericValue(rawMoisture),
-      ph: numericValue(getLogValue(log, ["soil_ph", "ph", "pH"])),
       temperature: numericValue(log.temperature),
       humidity: numericValue(log.humidity),
       status: classification.legacyStatus,
@@ -79,15 +76,14 @@ export function reportRows(logs) {
   });
 }
 
-export function sendCsv(res, rows) {
+export function sendCsv(res, rows, globalSoilPh = {}) {
   const columns = reportColumns.map(({ header }) => header);
-  const csv = [columns, ...rows.map((row) => [
+  const csv = [["Global Soil pH", globalSoilPh.soilPh == null ? "-" : formatNumber(globalSoilPh.soilPh)], ["Pengukuran pH terakhir (WITA)", globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"], [], columns, ...rows.map((row) => [
     row.number,
     row.timestamp,
     row.sensor,
     row.bedengan,
     displayValue(row.moisture),
-    displayValue(row.ph),
     displayValue(row.temperature, 1),
     displayValue(row.humidity),
     row.status,
@@ -98,7 +94,7 @@ export function sendCsv(res, rows) {
   res.type("text/csv; charset=utf-8").send(`\uFEFF${csv}`);
 }
 
-export async function sendXlsx(res, rows, startDate, endDate) {
+export async function sendXlsx(res, rows, startDate, endDate, globalSoilPh = {}) {
   const workbook = new ExcelJS.Workbook();
   const summary = getSummary(rows);
   const summarySheet = workbook.addWorksheet("Ringkasan");
@@ -110,7 +106,8 @@ export async function sendXlsx(res, rows, startDate, endDate) {
     ["Sensor", rows[0]?.sensor || "-"],
     ["Jumlah data", summary.count],
     ["Rata-rata Soil Moisture (%)", summary.averageMoisture === null ? "-" : Number(summary.averageMoisture.toFixed(2))],
-    ["Rata-rata Soil pH", summary.averagePh === null ? "-" : Number(summary.averagePh.toFixed(2))],
+    ["Global Soil pH", globalSoilPh.soilPh == null ? "-" : Number(globalSoilPh.soilPh.toFixed(2))],
+    ["Pengukuran pH terakhir", globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"],
     ["Rata-rata Temperature (°C)", summary.averageTemperature === null ? "-" : Number(summary.averageTemperature.toFixed(1))],
     ["Dibuat pada", formatWitaTimestamp(new Date())],
   ]);
@@ -126,7 +123,7 @@ export async function sendXlsx(res, rows, startDate, endDate) {
   sheet.columns = reportColumns.map(({ header, key, width }) => ({ header, key, width }));
   sheet.addTable({
     name: "DataMonitoring",
-    ref: `A1:J${rows.length + 1}`,
+    ref: `A1:I${rows.length + 1}`,
     headerRow: true,
     totalsRow: false,
     style: { theme: "TableStyleMedium2", showRowStripes: true },
@@ -134,7 +131,6 @@ export async function sendXlsx(res, rows, startDate, endDate) {
     rows: rows.map((row) => [
       row.number, row.timestamp, row.sensor, row.bedengan,
       row.moisture === null ? "-" : row.moisture,
-      row.ph === null ? "-" : row.ph,
       row.temperature === null ? "-" : row.temperature,
       row.humidity === null ? "-" : row.humidity,
       row.status, row.pump,
@@ -143,20 +139,20 @@ export async function sendXlsx(res, rows, startDate, endDate) {
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   sheet.getColumn(1).alignment = { horizontal: "center" };
-  [5, 6, 7, 8].forEach((column) => { sheet.getColumn(column).numFmt = column === 7 ? "0.0" : "0.00"; });
-  sheet.views = [{ state: "frozen", ySplit: 1, autoFilter: "A1:J1" }];
+  [5, 6, 7].forEach((column) => { sheet.getColumn(column).numFmt = column === 6 ? "0.0" : "0.00"; });
+  sheet.views = [{ state: "frozen", ySplit: 1, autoFilter: "A1:I1" }];
   const buffer = await workbook.xlsx.writeBuffer();
   res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(Buffer.from(buffer));
 }
 
-export function sendPdf(res, rows, startDate, endDate) {
+export function sendPdf(res, rows, startDate, endDate, globalSoilPh = {}) {
   const document = new PDFDocument({ margin: 36, bottomMargin: 54, size: "A4", layout: "landscape" });
   const summary = getSummary(rows);
   const dateRange = startDate === endDate
     ? witaDateFormatter.format(new Date(`${startDate}T00:00:00+08:00`))
     : `${witaDateFormatter.format(new Date(`${startDate}T00:00:00+08:00`))} - ${witaDateFormatter.format(new Date(`${endDate}T00:00:00+08:00`))}`;
   const tableWidth = document.page.width - document.page.margins.left - document.page.margins.right;
-  const columnWidths = [28, 104, 74, 70, 82, 50, 82, 72, 66, 66];
+  const columnWidths = [28, 104, 74, 70, 82, 82, 72, 66, 66];
   const tableHeaders = reportColumns.map(({ header }) => header);
   const drawFooter = () => {
     document.save();
@@ -181,7 +177,7 @@ export function sendPdf(res, rows, startDate, endDate) {
   const drawTableRow = (row) => {
     const values = [
       row.number, row.timestamp, row.sensor, row.bedengan,
-      displayValue(row.moisture), displayValue(row.ph), displayValue(row.temperature, 1),
+      displayValue(row.moisture), displayValue(row.temperature, 1),
       displayValue(row.humidity), row.status, row.pump,
     ];
     const startX = document.page.margins.left;
@@ -206,7 +202,7 @@ export function sendPdf(res, rows, startDate, endDate) {
   document.fontSize(9).text(`Periode data: ${dateRange} (WITA)`, { align: "center" }).moveDown(1);
   document.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text("Ringkasan Data");
   document.font("Helvetica").fontSize(9).fillColor("#334155").text(`Sensor: ${rows[0]?.sensor || "-"}    |    Jumlah data: ${summary.count}    |    Dibuat: ${formatWitaTimestamp(new Date())}`);
-  document.text(`Rata-rata Soil Moisture: ${displayValue(summary.averageMoisture)}%    |    Rata-rata Soil pH: ${displayValue(summary.averagePh)}    |    Rata-rata Temperature: ${displayValue(summary.averageTemperature, 1)} °C`).moveDown(1);
+  document.text(`Rata-rata Soil Moisture: ${displayValue(summary.averageMoisture)}%    |    Global Soil pH: ${displayValue(globalSoilPh.soilPh)} (terakhir: ${globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"})    |    Rata-rata Temperature: ${displayValue(summary.averageTemperature, 1)} °C`).moveDown(1);
   document.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text("Data Monitoring").moveDown(0.4);
   drawTableHeader();
   rows.forEach((row) => {

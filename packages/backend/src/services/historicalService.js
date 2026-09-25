@@ -57,8 +57,8 @@ export async function getHistoricalReadings(filters) {
   }
 
   const select = sourceHasCanonicalStatus
-    ? "id, sensor_id, moisture, soil_ph, temperature, humidity, status, created_at, sensors (sensor_name, bedengan, location)"
-    : "id, sensor_id, moisture, soil_ph, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)";
+    ? "id, sensor_id, moisture, temperature, humidity, status, created_at, sensors (sensor_name, bedengan, location)"
+    : "id, sensor_id, moisture, temperature, humidity, created_at, sensors (sensor_name, bedengan, location)";
   let query = supabase
     .from(config.logsTable)
     .select(select, { count: "exact" });

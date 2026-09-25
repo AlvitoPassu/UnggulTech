@@ -10,6 +10,7 @@ import {
 } from "../services/reportService.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import { logAudit } from "../services/auditService.js";
+import { getLatestSoilPh } from "../services/soilPhService.js";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.post("/download", requireAuth, async (req, res, next) => {
     }
 
     const logs = await getLogs(filters);
-    const rows = reportRows(logs);
+    const [rows, globalSoilPh] = [reportRows(logs), await getLatestSoilPh()];
     const filename = makeFilename(filters.sensorId, filters.startDate, filters.endDate, filters.format);
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
@@ -40,12 +41,12 @@ router.post("/download", requireAuth, async (req, res, next) => {
     });
 
     if (filters.format === "csv") {
-      return sendCsv(res, rows);
+      return sendCsv(res, rows, globalSoilPh);
     }
     if (filters.format === "xlsx") {
-      return await sendXlsx(res, rows, filters.startDate, filters.endDate);
+      return await sendXlsx(res, rows, filters.startDate, filters.endDate, globalSoilPh);
     }
-    return sendPdf(res, rows, filters.startDate, filters.endDate);
+    return sendPdf(res, rows, filters.startDate, filters.endDate, globalSoilPh);
   } catch (error) {
     next(error);
   }

@@ -27,14 +27,11 @@ const char* password = "unklab123";
 
 // Backend VPS Anda
 const char* serverUrl =
-    "https://unggulmonitoring.com/api/sensors";
+    "https://unggulmonitoring.com/api/sensors/ph";
 
 // Endpoint health check backend
 const char* pingUrl =
     "https://unggulmonitoring.com/health";
-
-// Jumlah bedengan yang diupdate (sensor1 s/d sensor6)
-const int JUMLAH_BEDENGAN = 6;
 
 // ================= CLIENT SECURE =====================
 WiFiClientSecure secureWifiClient;
@@ -135,23 +132,9 @@ void sendDataToServer(float adcValue, float pHValue) {
   HTTPClient http;
   String targetUrl = String(serverUrl);
 
-  // Buat JSON payload untuk seluruh bedengan (sensor1 s/d sensor6):
-  String jsonPayload = "{";
-  jsonPayload.reserve(600);
-  for (int i = 1; i <= JUMLAH_BEDENGAN; i++) {
-    jsonPayload += "\"sensor" + String(i) + "\":{";
-    jsonPayload += "\"channel\":" + String(i - 1) + ",";
-    jsonPayload += "\"soil_ph\":" + String(pHValue, 2) + ",";
-    jsonPayload += "\"ph\":" + String(pHValue, 2) + ",";
-    jsonPayload += "\"adc\":" + String((int)adcValue) + ",";
-    jsonPayload += "\"kelembaban\":0,";
-    jsonPayload += "\"status\":\"pH Monitor\"";
-    jsonPayload += "}";
-    if (i < JUMLAH_BEDENGAN) {
-      jsonPayload += ",";
-    }
-  }
-  jsonPayload += "}";
+  // Satu probe pH menghasilkan satu pembacaan global. Jangan kirim sebagai
+  // sensor1..sensor6 atau menyertakan dummy moisture.
+  String jsonPayload = "{\"soil_ph\":" + String(pHValue, 2) + "}";
 
   beginHttpClient(http, targetUrl);
   http.addHeader("Content-Type", "application/json");

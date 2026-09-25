@@ -3,6 +3,7 @@ import { getHistoricalStatistics, getHistoricalTrend } from "./historicalService
 import { getNurseryOverview } from "./sensorService.js";
 import { getWeatherForecast } from "./weatherService.js";
 import { getLatestRainfall } from "./rainfallService.js";
+import { getLatestSoilPh } from "./soilPhService.js";
 import { validateChatbotTopic } from "./domainGuard.js";
 import { getRecommendationDecision } from "../domain/recommendationDecisionEngine.js";
 
@@ -16,6 +17,7 @@ Bedakan fakta data aktual dan analisis/rekomendasi. Bila konteks memuat operatio
 Untuk curah hujan aktual, perhatikan field availability, freshness, isFresh, dan measured_at pada konteks. Fresh berarti pengukuran terjadi pada hari kalender ini di WITA (Asia/Makassar). Stale berarti record terakhir tersedia tetapi bukan data hari ini; sebutkan measured_at dan jangan klaim sebagai curah hujan hari ini atau kondisi saat ini. Missing berarti tidak ada record pengukuran. Jangan mengarang data curah hujan.
 Untuk keputusan operasional per sensor, gunakan hanya field rainfall yang berada pada objek sensor yang sama. Field tersebut sudah dicakup oleh nursery dan bedengan sensor itu; jangan memakai data curah hujan sensor atau bedengan lain sebagai pengganti.
 Klasifikasikan soil moisture sesuai policy aplikasi: 0%-30% adalah Kering dan perlu perhatian; di atas 30% hingga 70% adalah Normal; di atas 70% hingga 100% adalah Basah. Perlu Perhatian adalah warning operasional untuk kondisi Kering, bukan kategori kondisi soil moisture. Status kesehatan sensor seperti online, offline, atau stale harus disebut terpisah dari kondisi moisture. Jika seluruh sensor offline atau tidak ada pembacaan terbaru, katakan bahwa soil moisture aktual belum dapat ditentukan.
+Untuk pH tanah gunakan hanya field globalSoilPh: ini satu pembacaan global yang berlaku untuk seluruh bedengan, bukan pembacaan per-bedengan. Sebutkan status dan waktu pengukuran bila tersedia; nilai dengan status inactive adalah pembacaan valid terakhir, bukan pembacaan real-time.
 Pahami soil moisture, sensor, bedengan, nursery, bibit, penyiraman, dan curah hujan. Sebutkan timestamp bila relevan. Gunakan paragraf pendek atau bullet bila membantu.
 Berikan jawaban dalam format plain text yang terstruktur. Jangan gunakan Markdown formatting seperti *, **, #, ##, atau Markdown bullet list. Gunakan judul section tanpa simbol Markdown dan pisahkan setiap section dengan satu baris kosong. Untuk daftar gunakan numbering 1., 2., 3. atau karakter bullet yang dapat ditampilkan dengan baik oleh UI. Jangan menampilkan syntax Markdown mentah kepada pengguna. Gunakan bahasa Indonesia yang jelas, ringkas, dan profesional.`;
 
@@ -123,10 +125,11 @@ export async function getScopedOperationalDecisions(sensors = [], rainfallLookup
 async function buildNurseryContext(message) {
   const needs = getQuestionNeeds(message);
   const needsRainfall = needs.weather || needs.operational;
-  const [overview, historical, weatherResult] = await Promise.all([
+  const [overview, historical, weatherResult, soilPh] = await Promise.all([
     needs.overview ? getNurseryOverview() : null,
     getHistoricalContext(needs.history),
     needs.weather ? getWeatherForecast().catch(() => null) : null,
+    getLatestSoilPh(),
   ]);
   const scopedDecisions = overview && needs.operational
     ? await getScopedOperationalDecisions(overview.sensors)
@@ -143,6 +146,7 @@ async function buildNurseryContext(message) {
   }
 
   const context = { generatedAt: new Date().toISOString() };
+  context.globalSoilPh = soilPh;
   if (overview) {
     context.summary = overview.summary;
     context.sensors = overview.sensors.map(({ id, sensor_name, bedengan, location, status, moisture, lastSeen, isOnline, condition, needsAttention, sensorHealth }, index) => ({

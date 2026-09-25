@@ -43,6 +43,16 @@ export const getNurseryMoistureTrend = async (period = "24h") => {
   return response.data;
 };
 
+export const getGlobalSoilPh = async () => {
+  const response = await axios.get("/api/sensors/ph");
+  return response.data;
+};
+
+export const getGlobalSoilPhHistory = async (limit = 100) => {
+  const response = await axios.get("/api/sensors/ph/history", { params: { limit } });
+  return response.data?.readings ?? [];
+};
+
 const getFallbackMoistureClassification = (input) => {
   if (input === null || input === undefined || typeof input === "boolean") {
     return { condition: null, needsAttention: false, legacyStatus: null };
@@ -96,7 +106,6 @@ export const getSensorData = async (sensorId) => {
 
   return {
     ...data,
-    soilPh: data.soil_ph === null || data.soil_ph === undefined ? null : Number(data.soil_ph),
     humidityStatus: getHumidityStatus(humidityValue),
     status: data.status || fallback.legacyStatus || "Tidak tersedia",
     legacyStatus: data.legacyStatus ?? fallback.legacyStatus,

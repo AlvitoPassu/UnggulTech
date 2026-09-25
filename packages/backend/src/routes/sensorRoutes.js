@@ -4,6 +4,7 @@ import { formatWitaTimestamp } from "../utils/dateHelper.js";
 import { validateSensorId } from "../utils/validators.js";
 import { getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
 import { classifyMoisture } from "../domain/moistureClassifier.js";
+import { createSoilPhReading, getLatestSoilPh, getSoilPhHistory } from "../services/soilPhService.js";
 
 const router = Router();
 
@@ -55,6 +56,37 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// Global pH is intentionally separate from per-bedengan moisture readings.
+router.post("/ph", async (req, res, next) => {
+  try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Payload pH tidak valid." });
+    }
+
+    const reading = await createSoilPhReading(req.body);
+    return res.status(201).json({ message: "Data pH berhasil disimpan.", reading });
+  } catch (error) {
+    if (error.statusCode === 400) return res.status(400).json({ message: error.message });
+    return next(error);
+  }
+});
+
+router.get("/ph", async (_req, res, next) => {
+  try {
+    return res.json(await getLatestSoilPh());
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/ph/history", async (req, res, next) => {
+  try {
+    return res.json({ readings: await getSoilPhHistory(req.query.limit) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // -----------------------------
 // GET /api/sensors/:sensorId/recent-logs
 // -----------------------------
@@ -75,7 +107,6 @@ router.get("/:sensorId/recent-logs", async (req, res, next) => {
         id: log.id,
         time: formatWitaTimestamp(log[config.timestampColumn]),
         moisture,
-        soil_ph: log.soil_ph ?? null,
         temperature: log.temperature ?? null,
         humidity: log.humidity ?? null,
         action: classification.legacyStatus || "Tidak tersedia",

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiCalendar, FiChevronLeft, FiChevronRight, FiDownload, FiEdit2, FiInfo, FiRefreshCw, FiSearch } from "react-icons/fi";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getHistoricalReadings, getHistoricalStatistics, getHistoricalTrend } from "../api/historicalApi";
-import { getSensors } from "../api/sensorApi";
+import { getGlobalSoilPh, getGlobalSoilPhHistory, getSensors } from "../api/sensorApi";
 import { getRainfallHistory, updateRainfallReading } from "../api/rainfallApi";
 import DownloadDataModal from "../components/Dashboard/DownloadDataModal";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +45,8 @@ function HistoricalDataPage() {
   const [readings, setReadings] = useState([]);
   const [statistics, setStatistics] = useState(null);
   const [trend, setTrend] = useState([]);
+  const [globalSoilPh, setGlobalSoilPh] = useState(null);
+  const [globalSoilPhHistory, setGlobalSoilPhHistory] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0, hasNext: false, hasPrevious: false });
   const [loading, setLoading] = useState({ table: true, stats: true, trend: true });
   const [error, setError] = useState(false);
@@ -83,7 +85,9 @@ function HistoricalDataPage() {
       getHistoricalReadings(activeFilters),
       getHistoricalStatistics(activeFilters),
       getHistoricalTrend(activeFilters),
-    ]).then(([readingResponse, statisticsResponse, trendResponse]) => {
+      getGlobalSoilPh(),
+      getGlobalSoilPhHistory(),
+    ]).then(([readingResponse, statisticsResponse, trendResponse, soilPhReading, soilPhReadings]) => {
       if (cancelled) return;
       const readingData = unwrap(readingResponse, "readings");
       setReadings(Array.isArray(readingData) ? readingData : []);
@@ -91,6 +95,8 @@ function HistoricalDataPage() {
       setStatistics(statisticsResponse?.statistics ?? statisticsResponse?.data ?? statisticsResponse);
       const trendData = unwrap(trendResponse, "trend");
       setTrend(Array.isArray(trendData) ? trendData : []);
+      setGlobalSoilPh(soilPhReading);
+      setGlobalSoilPhHistory(Array.isArray(soilPhReadings) ? soilPhReadings : []);
     }).catch(() => { if (!cancelled) setError(true); }).finally(() => {
       if (!cancelled) setLoading({ table: false, stats: false, trend: false });
     });
@@ -111,6 +117,7 @@ function HistoricalDataPage() {
   const setPage = (page) => { setLoading((current) => ({ ...current, table: true })); setError(false); setActiveFilters((current) => ({ ...current, page })); };
   const setInterval = (interval) => { startRequest(); setActiveFilters((current) => ({ ...current, interval, page: 1 })); };
   const stat = (key) => statistics?.[key] ?? statistics?.[`${key}Moisture`];
+  const soilPhTrend = globalSoilPhHistory.map((reading) => ({ timestamp: reading.measuredAt, soilPh: reading.soilPh }));
   const rainfallNurseries = [...new Set([...sensors.map((sensor) => sensor.location), ...rainfallHistory.map((reading) => reading.nursery)].filter(Boolean))];
   const rainfallBedengans = [...new Set([...sensors.filter((sensor) => selectedRainfallNursery === "all" || sensor.location === selectedRainfallNursery).map((sensor) => sensor.bedengan), ...rainfallHistory.map((reading) => reading.bedengan)].filter((value) => value !== null && value !== undefined && value !== ""))];
   const openEditModal = (reading) => {
@@ -182,6 +189,7 @@ function HistoricalDataPage() {
     <Panel className="mb-6 p-4 sm:p-5"><div className="mb-4 flex items-center gap-2"><FiSearch className="text-[#1DAADF]" /><h2 className="text-sm font-bold text-slate-800">Filter Data</h2></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"><label className="text-xs font-medium text-slate-600">Tanggal Mulai<input type="date" value={draftFilters.startDate} onChange={(event) => updateDraft("startDate", event.target.value)} className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700" /></label><label className="text-xs font-medium text-slate-600">Tanggal Akhir<input type="date" value={draftFilters.endDate} onChange={(event) => updateDraft("endDate", event.target.value)} className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700" /></label><label className="text-xs font-medium text-slate-600">Sensor<select value={draftFilters.sensorId} onChange={(event) => updateDraft("sensorId", event.target.value)} className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><option value="">Semua Sensor</option>{sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{sensor.sensor_name || sensor.name || `Sensor ${sensor.id}`}</option>)}</select></label><label className="text-xs font-medium text-slate-600">Bedengan<select value={draftFilters.bedengan} onChange={(event) => updateDraft("bedengan", event.target.value)} className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><option value="">Semua Bedengan</option>{bedengans.map((bedengan) => <option key={bedengan} value={bedengan}>Bedengan {bedengan}</option>)}</select></label><label className="text-xs font-medium text-slate-600">Urutan<select value={draftFilters.sort} onChange={(event) => updateDraft("sort", event.target.value)} className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><option value="created_at_desc">Terbaru</option><option value="created_at_asc">Terlama</option><option value="moisture_desc">Moisture tertinggi</option><option value="moisture_asc">Moisture terendah</option></select></label></div><div className="mt-4 flex flex-wrap justify-end gap-2"><button type="button" onClick={applyFilters} className="rounded-md bg-[#1DAADF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1686b3]">Terapkan</button><button type="button" onClick={resetFilters} className="flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"><FiRefreshCw /> Reset</button></div></Panel>
 
     {error && <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><FiInfo /> Gagal memuat data historis. Silakan coba lagi.</div>}
+    <Panel className="mb-6 p-4 sm:p-5"><div className="mb-4"><h2 className="text-base font-bold text-slate-900">Riwayat Soil pH Global</h2><p className="mt-1 text-xs text-slate-500">Satu series untuk seluruh bedengan. Status: {globalSoilPh?.status === "active" ? "Aktif" : globalSoilPh?.status === "inactive" ? "Tidak Aktif (nilai terakhir tersedia)" : "Belum Ada Data"}</p></div>{soilPhTrend.length === 0 ? <div className="flex h-64 items-center justify-center text-sm text-slate-400">Belum ada riwayat pH global.</div> : <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={soilPhTrend} margin={{ top: 10, right: 12, left: -18, bottom: 4 }}><CartesianGrid stroke="#e2e8f0" vertical={false} /><XAxis dataKey="timestamp" tickFormatter={(value) => formatWita(value, { day: "2-digit", month: "short" })} tick={{ fontSize: 11, fill: "#64748b" }} /><YAxis domain={[0, 14]} tick={{ fontSize: 11, fill: "#64748b" }} /><Tooltip labelFormatter={(value) => `${formatWita(value, { dateStyle: "medium", timeStyle: "short" })} WITA`} formatter={(value) => [value, "pH Global"]} /><Line type="monotone" dataKey="soilPh" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: "#10b981" }} /></LineChart></ResponsiveContainer></div>}</Panel>
     <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard label="Rata-rata Soil Moisture" value={loading.stats ? "..." : displayValue(stat("average"), "%")} detail="Berdasarkan filter aktif" accent="text-blue-700" /><StatCard label="Nilai Terendah" value={loading.stats ? "..." : displayValue(stat("minimum"), "%")} detail="Pembacaan minimum" accent="text-orange-600" /><StatCard label="Nilai Tertinggi" value={loading.stats ? "..." : displayValue(stat("maximum"), "%")} detail="Pembacaan maksimum" accent="text-[#1DAADF]" /><StatCard label="Jumlah Data" value={loading.stats ? "..." : displayValue(stat("count"))} detail="Total pembacaan" accent="text-violet-700" /></div>
 
     <Panel className="mb-6 p-4 sm:p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-bold text-slate-900">Trend Soil Moisture</h2><p className="mt-1 text-xs text-slate-500">Rata-rata soil moisture berdasarkan waktu</p></div><select value={activeFilters.interval} onChange={(event) => setInterval(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"><option value="hour">Per Jam</option><option value="day">Per Hari</option></select></div>{loading.trend ? <div className="flex h-64 items-center justify-center text-sm text-slate-400">Memuat chart...</div> : trend.length === 0 ? <div className="flex h-64 items-center justify-center text-sm text-slate-400">Tidak ada data trend untuk filter yang dipilih.</div> : <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={trend} margin={{ top: 10, right: 12, left: -18, bottom: 4 }}><CartesianGrid stroke="#e2e8f0" vertical={false} /><XAxis dataKey="timestamp" tickFormatter={(value) => formatWita(value, { day: "2-digit", month: "short" })} tick={{ fontSize: 11, fill: "#64748b" }} /><YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "#64748b" }} /><Tooltip labelFormatter={(value) => `${formatWita(value, { dateStyle: "medium", timeStyle: "short" })} WITA`} formatter={(value) => [`${value}%`, "Rata-rata Moisture"]} /><Line type="monotone" dataKey="averageMoisture" stroke="#238b45" strokeWidth={2} dot={{ r: 3, fill: "#238b45" }} /></LineChart></ResponsiveContainer></div>}</Panel>

@@ -25,7 +25,7 @@ import {
 } from "react-icons/fi";
 import { getForecast } from "../api/weatherApi";
 import { getHistoricalTrend, getHistoricalReadings } from "../api/historicalApi";
-import { getSensorData, getSensors } from "../api/sensorApi";
+import { getGlobalSoilPh, getGlobalSoilPhHistory, getSensorData, getSensors } from "../api/sensorApi";
 import { createRainfallReading, getRainfallTrend } from "../api/rainfallApi";
 import { getRecommendationDecision } from "../api/recommendationApi";
 import { useAuth } from "../context/AuthContext";
@@ -176,6 +176,8 @@ const RecommendationAIPage = () => {
   const [selectedBedengan, setSelectedBedengan] = useState(() => searchParams.get("bedengan") || "all");
   const [selectedPeriod, setSelectedPeriod] = useState("7d");
   const [selectedSensorData, setSelectedSensorData] = useState(null);
+  const [globalSoilPh, setGlobalSoilPh] = useState(null);
+  const [globalSoilPhHistory, setGlobalSoilPhHistory] = useState([]);
   const [forecast, setForecast] = useState([]);
   const [rainfallTrend, setRainfallTrend] = useState([]);
   const [rainfallLoading, setRainfallLoading] = useState(true);
@@ -228,14 +230,18 @@ const RecommendationAIPage = () => {
       setError("");
 
       try {
-        const [sensorList, weatherForecast] = await Promise.all([
+        const [sensorList, weatherForecast, soilPhReading, soilPhReadings] = await Promise.all([
           getSensors(),
           getForecast(),
+          getGlobalSoilPh(),
+          getGlobalSoilPhHistory(),
         ]);
 
         if (!isCurrent) return;
 
         setSensors(sensorList);
+        setGlobalSoilPh(soilPhReading);
+        setGlobalSoilPhHistory(soilPhReadings);
 
         const sensorNursery = selectedNursery === "all" ? "" : selectedNursery;
 
@@ -402,7 +408,7 @@ const RecommendationAIPage = () => {
   const moisture = activeRecommendationData?.moisture ?? null;
   const moistureValue = moisture?.value ?? null;
   const moistureMeta = moistureStatus(moisture?.condition);
-  const phRaw = selectedSensorData?.soilPh ?? selectedSensorData?.soil_ph ?? null;
+  const phRaw = globalSoilPh?.soilPh ?? null;
   const phValue = phRaw === null || phRaw === undefined || phRaw === "" ? null : Number(phRaw);
   const phMeta = phStatus(phValue);
   const rainfallReading = activeRecommendationData?.rainfall ?? null;
@@ -491,10 +497,10 @@ const RecommendationAIPage = () => {
   );
 
   const phTrend = useMemo(
-    () => (selectedSensorData?.chart || [])
-      .filter((entry) => entry.soil_ph !== null && entry.soil_ph !== undefined && Number.isFinite(Number(entry.soil_ph)))
-      .map((entry) => ({ ...entry, value: Number(entry.soil_ph) })),
-    [selectedSensorData]
+    () => globalSoilPhHistory
+      .filter((entry) => Number.isFinite(Number(entry.soilPh)))
+      .map((entry) => ({ ...entry, label: formatWita(entry.measuredAt, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), value: Number(entry.soilPh) })),
+    [globalSoilPhHistory]
   );
 
   useEffect(() => {
@@ -634,7 +640,7 @@ const RecommendationAIPage = () => {
             <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{phValue === null || Number.isNaN(phValue) ? "-" : phValue.toFixed(2)}</p>
             <p className="mt-3 text-[11px] text-slate-500">Kisaran target: 5.0 – 6.5</p>
             <p className="mt-1 text-[11px] text-slate-500">Optimal: 5.5 – 6.0</p>
-            <p className="mt-1 text-[11px] text-slate-500">{phValue === null || Number.isNaN(phValue) ? "Data pH belum tersedia." : "Parameter pH tanah aktual"}</p>
+            <p className="mt-1 text-[11px] text-slate-500">{phValue === null || Number.isNaN(phValue) ? "Data pH belum tersedia." : globalSoilPh?.status === "active" ? "Global pH aktif untuk seluruh bedengan" : `pH terakhir: ${formatWita(globalSoilPh?.measuredAt, { dateStyle: "medium", timeStyle: "short" })} WITA`}</p>
             <div className="mt-auto h-10 w-full overflow-hidden rounded-lg bg-slate-100 p-1">
               <div className="flex h-full items-end gap-1">
                 {[5.2, 5.6, 6.1, 5.8, 5.9, 6.3, 5.7].map((point, index) => (
