@@ -83,14 +83,11 @@ constexpr uint8_t muxSettleDelayMs = 5;
 // =====================================================
 
 struct SensorReading {
-
     uint8_t channel;
-
     int adcValue;
-
     int moisturePercent;
-
     String soilStatus;
+    bool isConnected; // true jika sensor terpasang secara fisik dan aktif
 };
 
 // =====================================================
@@ -98,11 +95,8 @@ struct SensorReading {
 // =====================================================
 
 struct DhtReading {
-
     float temperature; // Celsius
-
     float humidity;    // Persen RH
-
     bool valid;        // true jika pembacaan berhasil
 };
 
@@ -117,24 +111,27 @@ DhtReading dhtData = { 0.0f, 0.0f, false };
 // =====================================================
 
 struct SensorConfig {
-
     uint8_t channel;
-
     int adcDry;
-
     int adcWet;
-
     const char* label;
+    bool enabled; // true untuk aktif, false jika ingin menonaktifkan secara manual
 };
+
+// =====================================================
+// AMBANG BATAS DETEKSI KABEL/SENSOR TERHUBUNG
+// =====================================================
+// Sensor capacitive normal memiliki ADC ~1500 (basah kuyup) hingga ~3100 (kering udara).
+// Jika kabel dicabut atau sensor rusak/floating, ADC akan jatuh < 300 atau > 3500.
+constexpr int adcMinConnected = 380;
+constexpr int adcMaxConnected = 3500;
 
 // =====================================================
 // SERVER DAN CLIENT
 // =====================================================
 
 WebServer server(80);
-
 WiFiClient wifiClient;
-
 WiFiClientSecure secureWifiClient;
 
 // =====================================================
@@ -142,136 +139,71 @@ WiFiClientSecure secureWifiClient;
 // =====================================================
 
 // Sensor 1 - Capacitive v2.0
-// map(adcValue, 2782, 1907, 0, 100)
-
 constexpr SensorConfig sensor1Config = {
-
     sensor1Channel,
-
-    2782,
-
-    1907,
-
-    "Sensor 1"
+    2684,
+    1657,
+    "Sensor 1",
+    true
 };
 
 // Sensor 2 - Capacitive v2.0
-// map(adcValue, 2684, 1657, 0, 100)
-
-constexpr SensorConfig sensor2Config = {
-
-    sensor2Channel,
-
-    2684,
-
-    1657,
-
-    "Sensor 2"
-};
+// constexpr SensorConfig sensor2Config = {
+//     sensor2Channel,
+//     4095,
+//     0,
+//     "Sensor 2",
+//     true
+// };
 
 // Sensor 3 - Capacitive v2.0
-// map(adcValue, 2996, 2388, 0, 100)
-
 constexpr SensorConfig sensor3Config = {
-
     sensor3Channel,
-
-    2996,
-
-    2388,
-
-    "Sensor 3"
+    1843,
+    1035,
+    "Sensor 3",
+    true
 };
 
 // Sensor 4 - Capacitive v2.0
-// map(adcValue, 2967, 2232, 0, 100)
-
+// Jika sensor 4 bermasalah, deteksi otomatis akan mendeteksi saat kabel dicabut.
+// Anda juga bisa mengubah true -> false di bawah jika ingin mematikannya secara paksa.
 constexpr SensorConfig sensor4Config = {
-
     sensor4Channel,
-
-    2967,
-
-    2232,
-
-    "Sensor 4"
+    1672,
+    380,
+    "Sensor 4",
+    true
 };
 
 // Sensor 5 - Capacitive v2.0
-// map(adcValue, 2852, 1972, 0, 100)
-
 constexpr SensorConfig sensor5Config = {
-
     sensor5Channel,
-
     2852,
-
     1972,
-
-    "Sensor 5"
+    "Sensor 5",
+    true
 };
 
 // Sensor 6 - Capacitive v2.0
-// map(adcValue, 2865, 2104, 0, 100)
-
 constexpr SensorConfig sensor6Config = {
-
     sensor6Channel,
-
-    2865,
-
-    2104,
-
-    "Sensor 6"
+    2310,
+    1448,
+    "Sensor 6",
+    true
 };
-
-
 
 // =====================================================
 // DATA SENSOR
 // =====================================================
 
-SensorReading sensor1 = {
-    sensor1Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
-
-SensorReading sensor2 = {
-    sensor2Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
-
-SensorReading sensor3 = {
-    sensor3Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
-
-SensorReading sensor4 = {
-    sensor4Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
-
-SensorReading sensor5 = {
-    sensor5Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
-
-SensorReading sensor6 = {
-    sensor6Config.channel,
-    0,
-    0,
-    "Tidak tersedia"
-};
+SensorReading sensor1 = { sensor1Config.channel, 0, 0, "Tidak tersedia", false };
+// SensorReading sensor2 = { sensor2Config.channel, 0, 0, "Tidak tersedia", false };
+SensorReading sensor3 = { sensor3Config.channel, 0, 0, "Tidak tersedia", false };
+SensorReading sensor4 = { sensor4Config.channel, 0, 0, "Tidak tersedia", false };
+SensorReading sensor5 = { sensor5Config.channel, 0, 0, "Tidak tersedia", false };
+SensorReading sensor6 = { sensor6Config.channel, 0, 0, "Tidak tersedia", false };
 
 
 
@@ -356,6 +288,17 @@ void selectMuxChannel(uint8_t channel) {
 SensorReading readSoilSensor(
     const SensorConfig& config
 ) {
+    SensorReading reading;
+    reading.channel = config.channel;
+
+    // Jika sensor dinonaktifkan secara manual di konfigurasi
+    if (!config.enabled) {
+        reading.adcValue = 0;
+        reading.moisturePercent = 0;
+        reading.soilStatus = "Dinonaktifkan";
+        reading.isConnected = false;
+        return reading;
+    }
 
     // Pilih channel
     selectMuxChannel(config.channel);
@@ -376,42 +319,44 @@ SensorReading readSoilSensor(
         i < sensorSamplesPerRead;
         i++
     ) {
-
         totalAdc += analogRead(muxSigPin);
-
         delay(2);
     }
 
-    SensorReading reading;
-
-    reading.channel = config.channel;
-
     // Rata-rata ADC
-    reading.adcValue =
-        totalAdc / sensorSamplesPerRead;
+    reading.adcValue = totalAdc / sensorSamplesPerRead;
 
-    // Konversi ADC ke kelembaban
-    reading.moisturePercent = map(
-        reading.adcValue,
-        config.adcDry,
-        config.adcWet,
-        0,
-        100
-    );
+    // Deteksi apakah sensor terpasang secara fisik:
+    // Nilai ADC sensor normal berada di antara ~1500 (basah) dan ~3100 (kering).
+    // Jika kabel dicabut atau rusak total, ADC jatuh < 500 atau > 3500.
+    if (reading.adcValue < adcMinConnected || reading.adcValue > adcMaxConnected) {
+        reading.isConnected = false;
+        reading.moisturePercent = 0;
+        reading.soilStatus = "Terputus";
+    } else {
+        reading.isConnected = true;
 
-    // Pastikan 0-100%
-    reading.moisturePercent =
-        constrain(
+        // Konversi ADC ke kelembaban
+        reading.moisturePercent = map(
+            reading.adcValue,
+            config.adcDry,
+            config.adcWet,
+            0,
+            100
+        );
+
+        // Pastikan 0-100%
+        reading.moisturePercent = constrain(
             reading.moisturePercent,
             0,
             100
         );
 
-    // Status tanah
-    reading.soilStatus =
-        getSoilStatus(
+        // Status tanah
+        reading.soilStatus = getSoilStatus(
             reading.moisturePercent
         );
+    }
 
     return reading;
 }
@@ -425,8 +370,8 @@ void updateAllSensors() {
     sensor1 =
         readSoilSensor(sensor1Config);
 
-    sensor2 =
-        readSoilSensor(sensor2Config);
+    // sensor2 =
+    //     readSoilSensor(sensor2Config);
 
     sensor3 =
         readSoilSensor(sensor3Config);
@@ -445,196 +390,77 @@ void updateAllSensors() {
 }
 
 // =====================================================
+// PEMBANTU JSON SENSOR
+// =====================================================
+
+void appendSensorJson(
+    String& json,
+    bool& isFirst,
+    const char* keyName,
+    const SensorReading& reading
+) {
+    // Lewati sensor jika kabel dicabut, rusak, atau dinonaktifkan
+    if (!reading.isConnected) {
+        return;
+    }
+
+    if (!isFirst) {
+        json += ",";
+    }
+    isFirst = false;
+
+    json += "\"";
+    json += keyName;
+    json += "\":{";
+
+    json += "\"channel\":";
+    json += String(reading.channel);
+    json += ",";
+
+    json += "\"kelembaban\":";
+    json += String(reading.moisturePercent);
+    json += ",";
+
+    json += "\"status\":\"";
+    json += reading.soilStatus;
+    json += "\",";
+
+    json += "\"adc\":";
+    json += String(reading.adcValue);
+    json += "}";
+}
+
+// =====================================================
 // BUAT JSON
 // =====================================================
 
 String buildSensorJson() {
-
     String json = "{";
+    bool isFirst = true;
 
-    // -------------------------------------------------
-    // Sensor 1
-    // -------------------------------------------------
-
-    json += "\"sensor1\":{";
-
-    json += "\"channel\":";
-    json += String(sensor1.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor1.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor1.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor1.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 2
-    // -------------------------------------------------
-
-    json += "\"sensor2\":{";
-
-    json += "\"channel\":";
-    json += String(sensor2.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor2.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor2.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor2.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 3
-    // -------------------------------------------------
-
-    json += "\"sensor3\":{";
-
-    json += "\"channel\":";
-    json += String(sensor3.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor3.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor3.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor3.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 4
-    // -------------------------------------------------
-
-    json += "\"sensor4\":{";
-
-    json += "\"channel\":";
-    json += String(sensor4.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor4.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor4.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor4.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 5
-    // -------------------------------------------------
-
-    json += "\"sensor5\":{";
-
-    json += "\"channel\":";
-    json += String(sensor5.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor5.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor5.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor5.adcValue);
-
-    json += "},";
-
-    // -------------------------------------------------
-    // Sensor 6
-    // -------------------------------------------------
-
-    json += "\"sensor6\":{";
-
-    json += "\"channel\":";
-    json += String(sensor6.channel);
-
-    json += ",";
-
-    json += "\"kelembaban\":";
-    json += String(sensor6.moisturePercent);
-
-    json += ",";
-
-    json += "\"status\":\"";
-    json += sensor6.soilStatus;
-    json += "\"";
-
-    json += ",";
-
-    json += "\"adc\":";
-    json += String(sensor6.adcValue);
-
-    json += "}";
+    // Hanya masukkan sensor yang fisiknya terhubung dan aktif
+    appendSensorJson(json, isFirst, "sensor1", sensor1);
+    // appendSensorJson(json, isFirst, "sensor2", sensor2);
+    appendSensorJson(json, isFirst, "sensor3", sensor3);
+    appendSensorJson(json, isFirst, "sensor4", sensor4);
+    appendSensorJson(json, isFirst, "sensor5", sensor5);
+    appendSensorJson(json, isFirst, "sensor6", sensor6);
 
     // -------------------------------------------------
     // DHT11
     // -------------------------------------------------
-
-    json += ",";
-
+    if (!isFirst) {
+        json += ",";
+    }
     json += "\"dht11\":{";
-
     json += "\"suhu\":";
     json += String(dhtData.temperature, 1);
-
     json += ",";
-
     json += "\"kelembaban_udara\":";
     json += String(dhtData.humidity, 1);
-
     json += ",";
-
     json += "\"valid\":";
     json += dhtData.valid ? "true" : "false";
-
     json += "}";
 
     json += "}";
@@ -1116,12 +942,12 @@ void setup() {
         sensor1Config.adcWet
     );
 
-    Serial.printf(
-        "Sensor 2 | CH%u | Dry=%d | Wet=%d\n",
-        sensor2Config.channel,
-        sensor2Config.adcDry,
-        sensor2Config.adcWet
-    );
+    // Serial.printf(
+    //     "Sensor 2 | CH%u | Dry=%d | Wet=%d\n",
+    //     sensor2Config.channel,
+    //     sensor2Config.adcDry,
+    //     sensor2Config.adcWet
+    // );
 
     Serial.printf(
         "Sensor 3 | CH%u | Dry=%d | Wet=%d\n",
@@ -1160,6 +986,31 @@ void setup() {
     setupServer();
 
     testBackendConnection();
+}
+
+// =====================================================
+// PRINT STATUS SENSOR UNTUK SERIAL MONITOR
+// =====================================================
+
+void printSensorStatus(const char* name, const SensorReading& reading) {
+    if (reading.isConnected) {
+        Serial.printf(
+            "%s | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s [ONLINE]\n",
+            name,
+            reading.channel,
+            reading.adcValue,
+            reading.moisturePercent,
+            reading.soilStatus.c_str()
+        );
+    } else {
+        Serial.printf(
+            "%s | CH%u | ADC: %d | Status: %s [OFFLINE - Tidak dikirim ke server]\n",
+            name,
+            reading.channel,
+            reading.adcValue,
+            reading.soilStatus.c_str()
+        );
+    }
 }
 
 // =====================================================
@@ -1216,53 +1067,12 @@ void loop() {
                 : "Belum tersedia"
         );
 
-        Serial.printf(
-            "Sensor 1 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor1.channel,
-            sensor1.adcValue,
-            sensor1.moisturePercent,
-            sensor1.soilStatus.c_str()
-        );
-
-        Serial.printf(
-            "Sensor 2 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor2.channel,
-            sensor2.adcValue,
-            sensor2.moisturePercent,
-            sensor2.soilStatus.c_str()
-        );
-
-        Serial.printf(
-            "Sensor 3 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor3.channel,
-            sensor3.adcValue,
-            sensor3.moisturePercent,
-            sensor3.soilStatus.c_str()
-        );
-
-        Serial.printf(
-            "Sensor 4 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor4.channel,
-            sensor4.adcValue,
-            sensor4.moisturePercent,
-            sensor4.soilStatus.c_str()
-        );
-
-        Serial.printf(
-            "Sensor 5 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor5.channel,
-            sensor5.adcValue,
-            sensor5.moisturePercent,
-            sensor5.soilStatus.c_str()
-        );
-
-        Serial.printf(
-            "Sensor 6 | CH%u | ADC: %d | Kelembaban: %d%% | Status: %s\n",
-            sensor6.channel,
-            sensor6.adcValue,
-            sensor6.moisturePercent,
-            sensor6.soilStatus.c_str()
-        );
+        printSensorStatus("Sensor 1", sensor1);
+        // printSensorStatus("Sensor 2", sensor2);
+        printSensorStatus("Sensor 3", sensor3);
+        printSensorStatus("Sensor 4", sensor4);
+        printSensorStatus("Sensor 5", sensor5);
+        printSensorStatus("Sensor 6", sensor6);
 
 
 
