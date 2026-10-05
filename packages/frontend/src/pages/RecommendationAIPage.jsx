@@ -397,6 +397,15 @@ const RecommendationAIPage = () => {
     return [...new Set(filtered.map((sensor) => sensor.bedengan).filter((value) => value !== null && value !== undefined && value !== ""))].sort((a, b) => Number(a) - Number(b));
   }, [selectedNursery, sensors]);
 
+  const rainfallBedenganOptions = useMemo(() => (
+    sensors
+      .filter((sensor) => sensor.location === rainfallForm.nursery)
+      .map((sensor) => sensor.bedengan)
+      .filter((value) => value !== null && value !== undefined && value !== "")
+      .filter((value, index, values) => values.findIndex((item) => String(item) === String(value)) === index)
+      .sort((first, second) => Number(first) - Number(second))
+  ), [rainfallForm.nursery, sensors]);
+
   const selectedBedenganLabel = selectedBedengan === "all" ? "Semua bedengan" : `Bedengan ${selectedBedengan}`;
   const selectedNurseryLabel = selectedNursery === "all" ? "Semua nursery" : selectedNursery;
 
@@ -465,6 +474,15 @@ const RecommendationAIPage = () => {
   const handleRainfallSubmit = async (event) => {
     event.preventDefault();
     setRainfallMessage({ type: "", text: "" });
+
+    const hasMatchingSensorScope = sensors.some((sensor) => (
+      sensor.location === rainfallForm.nursery
+      && String(sensor.bedengan) === String(rainfallForm.bedengan)
+    ));
+    if (!hasMatchingSensorScope) {
+      setRainfallMessage({ type: "error", text: "Pilih nursery dan bedengan yang sesuai dengan sensor untuk pengukuran curah hujan." });
+      return;
+    }
 
     const inputValue = Number(rainfallForm.rainfall_value);
     if (!Number.isFinite(inputValue) || inputValue < 0) {
@@ -597,8 +615,8 @@ const RecommendationAIPage = () => {
             <div><h2 className="text-base font-bold text-slate-900">Input Curah Hujan</h2><p className="mt-1 text-xs text-slate-500">Masukkan hasil pembacaan aktual tabung ombrometer.</p></div>
           </div>
           <form onSubmit={handleRainfallSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="text-sm font-medium text-slate-700">Nursery<select value={rainfallForm.nursery} onChange={(event) => setRainfallForm((current) => ({ ...current, nursery: event.target.value, bedengan: "" }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua nursery</option>{nurseryOptions.map((nursery) => <option key={nursery} value={nursery}>{nursery}</option>)}</select></label>
-            <label className="text-sm font-medium text-slate-700">Bedengan<select value={rainfallForm.bedengan} onChange={(event) => setRainfallForm((current) => ({ ...current, bedengan: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Semua bedengan</option>{bedenganOptions.map((bedengan) => <option key={bedengan} value={bedengan}>Bedengan {bedengan}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Nursery<select required value={rainfallForm.nursery} onChange={(event) => setRainfallForm((current) => ({ ...current, nursery: event.target.value, bedengan: "" }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Pilih nursery</option>{nurseryOptions.map((nursery) => <option key={nursery} value={nursery}>{nursery}</option>)}</select></label>
+            <label className="text-sm font-medium text-slate-700">Bedengan<select required value={rainfallForm.bedengan} onChange={(event) => setRainfallForm((current) => ({ ...current, bedengan: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]"><option value="">Pilih bedengan</option>{rainfallBedenganOptions.map((bedengan) => <option key={bedengan} value={bedengan}>Bedengan {bedengan}</option>)}</select></label>
             <label className="text-sm font-medium text-slate-700">Curah Hujan<input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">Satuan: mm</span></label>
             <label className="text-sm font-medium text-slate-700">Tanggal Pengukuran<input required type="date" value={rainfallForm.measured_date} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_date: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
             <label className="text-sm font-medium text-slate-700">Waktu Pengukuran<input required type="time" value={rainfallForm.measured_time} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_time: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
