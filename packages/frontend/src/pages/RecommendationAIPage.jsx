@@ -137,6 +137,14 @@ const toneClasses = {
   neutral: "bg-slate-100 text-slate-600 border border-slate-200",
 };
 
+const parseGeneralRecommendation = (item) => {
+  if (typeof item !== "string") return null;
+
+  const [title, ...description] = item.trim().split("\n").filter(Boolean);
+  if (!title || !description.length) return null;
+  return { title, description: description.join(" ") };
+};
+
 const ChartCard = ({ title, description, data, color, children, emptyText }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="mb-4 flex items-center justify-between gap-3">
@@ -408,6 +416,9 @@ const RecommendationAIPage = () => {
     durationMinutes: null,
     schedule: [],
   }, [activeRecommendationData, recommendationError, recommendationLoading, selectedBedengan]);
+  const generalRecommendations = (Array.isArray(activeRecommendationData?.generalRecommendations) ? activeRecommendationData.generalRecommendations : [])
+    .map(parseGeneralRecommendation)
+    .filter(Boolean);
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const doSaveRainfall = async (inputValue, measuredAt) => {
@@ -742,20 +753,17 @@ const RecommendationAIPage = () => {
 
             <div className="mt-6">
               <h3 className="mb-3 text-base font-bold text-slate-900">Rekomendasi umum</h3>
-              <ol className="space-y-3 text-sm text-slate-700">
-                {recommendation.code === "water" ? (
-                  <>
-                    <li>1. Lakukan penyiraman sesuai jadwal selama 30 menit.</li>
-                    <li>2. Pantau kembali kelembaban media setelah penyiraman.</li>
-                    <li>3. Pantau kondisi pH jika berada di bawah kisaran target.</li>
-                    <li>4. Perhatikan prakiraan hujan untuk periode berikutnya.</li>
-                  </>
-                ) : (
-                  <>
-                    <li>1. Pertahankan kondisi media.</li>
-                    <li>2. Lanjutkan monitoring.</li>
-                    <li>3. Tinjau ulang data sensor secara berkala.</li>
-                  </>
+              <ol className="space-y-5 text-sm text-slate-700">
+                {generalRecommendations.length ? generalRecommendations.map((item, index) => (
+                  <li key={`${item.title}-${index}`} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
+                    <span className="font-semibold text-slate-900">{index + 1}.</span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{item.title}</p>
+                      <p className="mt-2 leading-6 text-slate-700">{item.description}</p>
+                    </div>
+                  </li>
+                )) : (
+                  <li className="text-slate-500">Rekomendasi umum belum tersedia.</li>
                 )}
               </ol>
             </div>
