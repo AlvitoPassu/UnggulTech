@@ -828,7 +828,7 @@ const RecommendationAIPage = () => {
           <div className="grid gap-4 xl:grid-cols-3">
             <ChartCard title="Kelembaban Tanah" description="Trend kelembaban tanah" data={primaryTrend} color="#1DAADF" emptyText="Data kelembaban tanah belum tersedia.">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={primaryTrend} margin={{ top: 10, right: 8, left: -18, bottom: 4 }}>
+                <AreaChart data={primaryTrend} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
                   <defs>
                     <linearGradient id="moistureFill" x1="0" x2="0" y1="0" y2="1">
                       <stop offset="5%" stopColor="#1DAADF" stopOpacity={0.4} />
@@ -837,7 +837,7 @@ const RecommendationAIPage = () => {
                   </defs>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
+                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip formatter={(value) => [`${value}%`, "Kelembaban"]} labelFormatter={(value) => value} />
                   <Area type="monotone" dataKey="value" stroke="#1DAADF" strokeWidth={2.5} fill="url(#moistureFill)" />
                 </AreaChart>
@@ -846,10 +846,10 @@ const RecommendationAIPage = () => {
 
             <ChartCard title="pH Tanah" description="Trend pH tanah aktual" data={phTrend} color="#10b981" emptyText="Data pH belum tersedia.">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={phTrend} margin={{ top: 10, right: 8, left: -18, bottom: 4 }}>
+                <LineChart data={phTrend} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[4.5, 7]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
+                  <YAxis domain={[4.5, 7]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip formatter={(value) => [value, "pH"]} />
                   <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                 </LineChart>
@@ -858,10 +858,10 @@ const RecommendationAIPage = () => {
 
             <ChartCard title="Curah Hujan" description="Trend curah hujan ombrometer" data={rainfallTrend} color="#38bdf8" emptyText="Belum ada pengukuran ombrometer.">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rainfallTrend} margin={{ top: 10, right: 8, left: -18, bottom: 4 }}>
+                <LineChart data={rainfallTrend} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
+                  <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip formatter={(value) => [`${value} mm`, "Curah Hujan"]} />
                   <Line type="monotone" dataKey="rainfall_value" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3 }} />
                 </LineChart>
