@@ -3,7 +3,7 @@ import { getLatestRainfall } from "./rainfallService.js";
 import { getSensorData } from "./sensorService.js";
 import { getLatestSoilPh } from "./soilPhService.js";
 import { getWeatherForecast } from "./weatherService.js";
-import { generateGeneralRecommendations } from "./recommendationNarrativeService.js";
+import { generateRecommendationNarratives } from "./recommendationNarrativeService.js";
 
 const getNearestForecast = (forecasts = []) => {
   if (!Array.isArray(forecasts) || !forecasts.length) return null;
@@ -46,7 +46,7 @@ export async function getRecommendationForSensor(sensorId) {
     },
   });
   const weather = getNearestForecast(forecasts);
-  const generalRecommendations = await generateGeneralRecommendations({
+  const narrativeContext = {
     decision: decisionResult.decision,
     moisture: decisionResult.moisture,
     sensorHealth: decisionResult.sensorHealth,
@@ -58,7 +58,8 @@ export async function getRecommendationForSensor(sensorId) {
       temperature: weather.temperature,
       humidity: weather.humidity,
     } : null,
-  });
+  };
+  const { generalRecommendations, decisionNarrative } = await generateRecommendationNarratives(narrativeContext);
 
   return {
     sensor: {
@@ -69,5 +70,6 @@ export async function getRecommendationForSensor(sensorId) {
     },
     ...decisionResult,
     generalRecommendations,
+    decisionNarrative,
   };
 }

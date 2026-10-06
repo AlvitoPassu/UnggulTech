@@ -130,6 +130,42 @@ test("pH history returns empty when PostgREST has not cached the pH table", { co
   });
 });
 
+test("getSoilPhHistory fetches latest records descending and returns them in chronological order", { concurrency: false }, async () => {
+  let orderArgs;
+  let limitArg;
+  await withSupabaseFromMock((table) => {
+    assert.equal(table, "soil_ph_readings");
+    return {
+      select: () => ({
+        order: (col, opts) => {
+          orderArgs = { col, opts };
+          return {
+            limit: async (lim) => {
+              limitArg = lim;
+              return {
+                data: [
+                  { id: 2, ph_value: 7.2, measured_at: "2026-10-06T08:16:00.000Z" },
+                  { id: 1, ph_value: 7.0, measured_at: "2026-10-06T08:15:00.000Z" },
+                ],
+                error: null,
+              };
+            },
+          };
+        },
+      }),
+    };
+  }, async () => {
+    const history = await getSoilPhHistory(10);
+    assert.equal(orderArgs.col, "measured_at");
+    assert.equal(orderArgs.opts.ascending, false);
+    assert.equal(limitArg, 10);
+    assert.deepEqual(history, [
+      { id: 1, soilPh: 7.0, measuredAt: "2026-10-06T08:15:00.000Z" },
+      { id: 2, soilPh: 7.2, measuredAt: "2026-10-06T08:16:00.000Z" },
+    ]);
+  });
+});
+
 test("unknown pH read errors still propagate", { concurrency: false }, async () => {
   const databaseError = { code: "PGRST999", message: "Unexpected database failure" };
   await withSupabaseFromMock(() => ({

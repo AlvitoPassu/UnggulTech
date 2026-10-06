@@ -145,14 +145,16 @@ const parseGeneralRecommendation = (item) => {
   return { title, description: description.join(" ") };
 };
 
-const ChartCard = ({ title, description, data, color, children, emptyText }) => (
+const ChartCard = ({ title, description, data, color, children, emptyText, badge }) => (
   <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="mb-4 flex items-center justify-between gap-3">
       <div>
         <h3 className="text-sm font-bold text-slate-900">{title}</h3>
         <p className="mt-1 text-[11px] text-slate-500">{description}</p>
       </div>
-      <span className="rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600" style={{ backgroundColor: `${color || "#e2e8f0"}20` }}>{data?.length ? "Aktual" : "Belum ada"}</span>
+      <span className="rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600" style={{ backgroundColor: `${color || "#e2e8f0"}20` }}>
+        {badge || (data?.length ? "Aktual" : "Belum ada")}
+      </span>
     </div>
     {data?.length ? (
       <div className="h-44 w-full">{children}</div>
@@ -228,7 +230,7 @@ const RecommendationAIPage = () => {
           getSensors(),
           getForecast(),
           getGlobalSoilPh(),
-          getGlobalSoilPhHistory(),
+          getGlobalSoilPhHistory(10),
         ]);
 
         if (!isCurrent) return;
@@ -419,6 +421,9 @@ const RecommendationAIPage = () => {
   const generalRecommendations = (Array.isArray(activeRecommendationData?.generalRecommendations) ? activeRecommendationData.generalRecommendations : [])
     .map(parseGeneralRecommendation)
     .filter(Boolean);
+  const decisionNarrative = typeof activeRecommendationData?.decisionNarrative === "string" && activeRecommendationData.decisionNarrative.trim()
+    ? activeRecommendationData.decisionNarrative.trim()
+    : recommendation.reason;
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const doSaveRainfall = async (inputValue, measuredAt) => {
@@ -492,7 +497,8 @@ const RecommendationAIPage = () => {
   const phTrend = useMemo(
     () => globalSoilPhHistory
       .filter((entry) => Number.isFinite(Number(entry.soilPh)))
-      .map((entry) => ({ ...entry, label: formatWita(entry.measuredAt, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), value: Number(entry.soilPh) })),
+      .slice(-10)
+      .map((entry) => ({ ...entry, label: formatWita(entry.measuredAt, { hour: "2-digit", minute: "2-digit" }), value: Number(entry.soilPh) })),
     [globalSoilPhHistory]
   );
 
@@ -731,8 +737,8 @@ const RecommendationAIPage = () => {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Status</p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{recommendation.title}</p>
+              <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Hasil keputusan</p>
+              <p className="mt-3 break-words text-2xl font-bold text-slate-900 sm:text-3xl">{recommendation.title}</p>
               {recommendation.code === "water" && (
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-xl bg-white p-3 border border-slate-200">
@@ -746,8 +752,8 @@ const RecommendationAIPage = () => {
                 </div>
               )}
               <div className="mt-4 rounded-xl bg-white p-3 border border-slate-200">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Alasan</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{recommendation.reason}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Penjelasan keputusan</p>
+                <p className="mt-2 break-words text-sm leading-7 text-slate-700">{decisionNarrative}</p>
               </div>
             </div>
 
@@ -793,7 +799,7 @@ const RecommendationAIPage = () => {
               <div>
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Kesimpulan</p>
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-3 leading-6 text-slate-700">
-                  {recommendation.reason}
+                  {decisionNarrative}
                 </p>
               </div>
 
@@ -844,12 +850,19 @@ const RecommendationAIPage = () => {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="pH Tanah" description="Trend pH tanah aktual" data={phTrend} color="#10b981" emptyText="Data pH belum tersedia.">
+            <ChartCard
+              title="pH Tanah"
+              description="10 data pembacaan terbaru"
+              data={phTrend}
+              color="#10b981"
+              badge={phTrend.length ? "10 data terbaru" : "Belum ada"}
+              emptyText="Data pH belum tersedia."
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={phTrend} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
                   <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[4.5, 7]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                  <YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip formatter={(value) => [value, "pH"]} />
                   <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                 </LineChart>

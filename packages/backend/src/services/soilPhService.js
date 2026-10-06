@@ -80,14 +80,14 @@ export async function getSoilPhHistory(limit = 100) {
   const { data, error } = await supabase
     .from("soil_ph_readings")
     .select("id, ph_value, measured_at")
-    .order("measured_at", { ascending: true })
+    .order("measured_at", { ascending: false })
     .limit(safeLimit);
 
   if (error) {
     if (isMissingSoilPhTable(error)) return [];
     throw error;
   }
-  return (data ?? []).map((reading) => ({
+  return (data ?? []).reverse().map((reading) => ({
     id: reading.id,
     soilPh: Number(reading.ph_value),
     measuredAt: reading.measured_at,
