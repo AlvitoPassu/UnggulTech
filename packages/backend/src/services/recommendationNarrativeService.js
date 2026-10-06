@@ -1,12 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 
-const recommendationInstruction = `Anda menyusun rekomendasi umum untuk petugas nursery bibit kelapa sawit.
+const recommendationInstruction = `Anda menyusun penjelasan keputusan dan rekomendasi umum untuk petugas nursery bibit kelapa sawit.
 Gunakan HANYA data pada JSON konteks. Jangan mengarang angka, status, dosis, volume air, interval, standar agronomi, atau kondisi yang tidak ada pada konteks.
-Keputusan operasional pada field decision sudah ditetapkan oleh aturan sistem dan tidak boleh diubah. Jika data sensor atau curah hujan tidak tersedia/terbaru, utamakan pemeriksaan atau pelengkapan data sebelum tindakan lapangan.
+Keputusan operasional pada field decision sudah ditetapkan oleh aturan sistem dan tidak boleh diubah. Field decisionNarrative hanya boleh menjelaskan keputusan tersebut: jangan mengganti, memperluas, atau memberi tindakan yang bertentangan dengan decision.code maupun decision.title. Khusus keputusan periksa bedengan atau data tidak tersedia, jangan memerintahkan penyiraman. Jika data sensor atau curah hujan tidak tersedia/terbaru, utamakan pemeriksaan atau pelengkapan data sebelum tindakan lapangan.
 
-Berikan 3 sampai 5 rekomendasi yang paling relevan dalam Bahasa Indonesia sederhana dan profesional. Setiap rekomendasi harus berupa satu string: baris pertama adalah judul tindakan yang jelas, lalu satu baris kosong, diikuti uraian 2 sampai 4 kalimat. Uraian wajib menjelaskan kondisi yang menjadi dasar, tindakan yang perlu dilakukan, alasan tindakan, dan hal yang harus dipantau sesudahnya. Jangan membuat rekomendasi satu kalimat, jangan mengulang isi antaritem, dan jangan menggunakan Markdown.
+Tulis decisionNarrative dalam Bahasa Indonesia sederhana dan profesional, tepat 2 sampai 4 kalimat. Narasi wajib menjelaskan kondisi yang terdeteksi, alasan keputusan, tindakan pertama, dan hal yang perlu dipantau berikutnya. Jangan memakai Markdown atau judul, dan jangan menyebut data yang tidak ada pada konteks.
 
-Keluarkan JSON valid saja dengan bentuk tepat: {"recommendations":["Judul\\n\\nUraian", "..."]}.`;
+Berikan 3 sampai 5 rekomendasi umum yang paling relevan. Setiap rekomendasi harus berupa satu string: baris pertama adalah judul tindakan yang jelas, lalu satu baris kosong, diikuti uraian 2 sampai 4 kalimat. Uraian wajib menjelaskan kondisi yang menjadi dasar, tindakan yang perlu dilakukan, alasan tindakan, dan hal yang harus dipantau sesudahnya. Jangan membuat rekomendasi satu kalimat, jangan mengulang isi antaritem, dan jangan menggunakan Markdown.
+
+Keluarkan JSON valid saja dengan bentuk tepat: {"decisionNarrative":"...", "recommendations":["Judul\\n\\nUraian", "..."]}.`;
 
 const conditionLabel = {
   dry: "kering",
@@ -36,6 +38,31 @@ const rainfallDetail = (rainfall = {}) => {
 };
 
 const recommendation = (title, description) => `${title}\n\n${description}`;
+
+const decisionTitle = (decision = {}) => decision.title || "Keputusan operasional saat ini";
+
+export const buildFallbackDecisionNarrative = ({ decision = {}, moisture = {}, sensorHealth, rainfall = {} } = {}) => {
+  const moistureText = moistureDetail(moisture);
+  const rainfallText = rainfallDetail(rainfall);
+  const title = decisionTitle(decision);
+
+  if (decision.code === "water") {
+    return `${moistureText}, sedangkan ${rainfallText.toLowerCase()}. Berdasarkan kondisi tersebut, sistem menetapkan keputusan ${title}. Lakukan penyiraman sesuai durasi dan jadwal yang sudah ditentukan sistem, lalu pantau pembacaan kelembaban berikutnya serta periksa media bila perubahan nilainya tidak sesuai kondisi lapangan.`;
+  }
+
+  if (decision.code === "no_watering") {
+    return `${moistureText}, sedangkan ${rainfallText.toLowerCase()}. Berdasarkan kondisi tersebut, sistem menetapkan keputusan ${title} sehingga penambahan air belum diperlukan. Pertahankan kondisi media saat ini dan pantau pembacaan kelembaban berikutnya serta curah hujan aktual sebelum menentukan tindakan selanjutnya.`;
+  }
+
+  if (decision.code === "inspect_bed") {
+    return `${moistureText}, sedangkan ${rainfallText.toLowerCase()}. Kondisi ini membuat sistem menetapkan keputusan ${title} agar tindakan tidak hanya didasarkan pada satu pembacaan. Periksa langsung kelembaban media, bagian yang terlalu basah atau kering, dan kesesuaiannya dengan sensor; setelah itu pantau pembacaan berikutnya sebelum menentukan tindakan lanjutan.`;
+  }
+
+  const unavailableText = sensorHealth !== "online"
+    ? "Status sensor belum online atau pembacaannya belum terbarui"
+    : rainfallText;
+  return `${unavailableText}. Sistem menetapkan keputusan ${title} karena data utama belum dapat digunakan untuk menentukan tindakan operasional. Periksa dan lengkapi sumber data yang diperlukan, kemudian bandingkan pembacaan terbaru dengan kondisi media di lapangan sebelum mengambil tindakan berikutnya.`;
+};
 
 const pHRecommendation = (soilPh) => {
   if (!Number.isFinite(soilPh?.soilPh)) return null;
@@ -158,25 +185,100 @@ export const parseGeneralRecommendationResponse = (text) => {
   }
 };
 
-export async function generateGeneralRecommendations(context) {
-  const fallback = buildFallbackGeneralRecommendations(context);
-  if (!process.env.GEMINI_API_KEY) return fallback;
+const normalizeDecisionNarrative = (input) => {
+  if (typeof input !== "string") return null;
+
+  const narrative = input.replace(/\s+/g, " ").trim();
+  const sentenceCount = narrative.split(/[.!?]+/).filter(Boolean).length;
+  if (narrative.length < 160 || narrative.length > 1200 || sentenceCount < 2 || sentenceCount > 4) return null;
+  return narrative;
+};
+
+const isDecisionNarrativeConsistent = (decision = {}, narrative = "") => {
+  const hasPositiveWateringAction = () => {
+    const actionPattern = /\b(lakukan|mulai|segera|tambahkan|menambah|berikan|beri)\s+(?:air|penyiraman)\b/gi;
+
+    return Array.from(narrative.matchAll(actionPattern)).some((match) => {
+      const precedingText = narrative.slice(Math.max(0, (match.index ?? 0) - 45), match.index);
+      return !/(?:jangan|tidak perlu|belum perlu|hindari)(?:\s+\w+){0,3}\s*$/i.test(precedingText);
+    });
+  };
+
+  if (decision.code === "water") return /penyiraman/i.test(narrative) && !/tunda\s+penyiraman/i.test(narrative);
+  if (decision.code === "no_watering") return !hasPositiveWateringAction();
+  if (decision.code === "inspect_bed" || decision.code === "sensor_unavailable" || decision.code === "rainfall_unavailable") {
+    return !hasPositiveWateringAction() && !/penyiraman\s+(?:dapat|bisa|perlu)\s+(?:dipertimbangkan|dilakukan)/i.test(narrative);
+  }
+  return true;
+};
+
+export const parseRecommendationNarrativeResponse = (text, decision = {}) => {
+  if (typeof text !== "string" || !text.trim()) return null;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const request = ai.models.generateContent({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      contents: `Konteks Recommendation AI (JSON):\n${JSON.stringify(context)}`,
-      config: {
-        systemInstruction: recommendationInstruction,
-        responseMimeType: "application/json",
-      },
-    });
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Permintaan Recommendation AI melebihi batas waktu.")), 20000));
-    const response = await Promise.race([request, timeout]);
-    return parseGeneralRecommendationResponse(response.text) || fallback;
+    const data = JSON.parse(text.replace(/^```json\s*|\s*```$/g, "").trim());
+    const generalRecommendations = normalizeRecommendations(data?.recommendations);
+    const decisionNarrative = normalizeDecisionNarrative(data?.decisionNarrative);
+    if (!generalRecommendations || !decisionNarrative || !isDecisionNarrativeConsistent(decision, decisionNarrative)) return null;
+
+    return { generalRecommendations, decisionNarrative };
+  } catch {
+    return null;
+  }
+};
+
+const requestGeminiNarratives = (context, apiKey) => {
+  const ai = new GoogleGenAI({ apiKey });
+  return ai.models.generateContent({
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    contents: `Konteks Recommendation AI (JSON):\n${JSON.stringify(context)}`,
+    config: {
+      systemInstruction: recommendationInstruction,
+      responseMimeType: "application/json",
+    },
+  });
+};
+
+const withTimeout = (request, timeoutMs, message) => new Promise((resolve, reject) => {
+  const timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  Promise.resolve(request).then(
+    (response) => {
+      clearTimeout(timeoutId);
+      resolve(response);
+    },
+    (error) => {
+      clearTimeout(timeoutId);
+      reject(error);
+    }
+  );
+});
+
+/**
+ * Menambah narasi presentasi tanpa pernah mengubah keputusan deterministik.
+ * `request` hanya digunakan untuk test agar kegagalan provider dapat disimulasikan.
+ */
+export async function generateRecommendationNarratives(context, { apiKey, request, timeoutMs = 20000 } = {}) {
+  const fallback = {
+    generalRecommendations: buildFallbackGeneralRecommendations(context),
+    decisionNarrative: buildFallbackDecisionNarrative(context),
+  };
+  const resolvedApiKey = apiKey === undefined ? process.env.GEMINI_API_KEY : apiKey;
+  if (!resolvedApiKey) return fallback;
+
+  try {
+    const providerRequest = request
+      ? request(context)
+      : requestGeminiNarratives(context, resolvedApiKey);
+    const response = await withTimeout(providerRequest, timeoutMs, "Permintaan Recommendation AI melebihi batas waktu.");
+    return parseRecommendationNarrativeResponse(response?.text, context?.decision) || fallback;
   } catch (error) {
     console.error("Recommendation AI fallback:", error.message || error);
     return fallback;
   }
+}
+
+// Kompatibilitas untuk pemanggil lama yang hanya membutuhkan rekomendasi umum.
+export async function generateGeneralRecommendations(context) {
+  const narratives = await generateRecommendationNarratives(context);
+  return narratives.generalRecommendations;
 }

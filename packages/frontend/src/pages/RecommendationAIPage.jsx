@@ -419,6 +419,9 @@ const RecommendationAIPage = () => {
   const generalRecommendations = (Array.isArray(activeRecommendationData?.generalRecommendations) ? activeRecommendationData.generalRecommendations : [])
     .map(parseGeneralRecommendation)
     .filter(Boolean);
+  const decisionNarrative = typeof activeRecommendationData?.decisionNarrative === "string" && activeRecommendationData.decisionNarrative.trim()
+    ? activeRecommendationData.decisionNarrative.trim()
+    : recommendation.reason;
   const nextForecast = forecast.find((item) => item && item.local_datetime) || forecast[0] || null;
 
   const doSaveRainfall = async (inputValue, measuredAt) => {
@@ -731,8 +734,8 @@ const RecommendationAIPage = () => {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Status</p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">{recommendation.title}</p>
+              <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Hasil keputusan</p>
+              <p className="mt-3 break-words text-2xl font-bold text-slate-900 sm:text-3xl">{recommendation.title}</p>
               {recommendation.code === "water" && (
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-xl bg-white p-3 border border-slate-200">
@@ -746,8 +749,8 @@ const RecommendationAIPage = () => {
                 </div>
               )}
               <div className="mt-4 rounded-xl bg-white p-3 border border-slate-200">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Alasan</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{recommendation.reason}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Penjelasan keputusan</p>
+                <p className="mt-2 break-words text-sm leading-7 text-slate-700">{decisionNarrative}</p>
               </div>
             </div>
 
@@ -793,7 +796,7 @@ const RecommendationAIPage = () => {
               <div>
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Kesimpulan</p>
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-3 leading-6 text-slate-700">
-                  {recommendation.reason}
+                  {decisionNarrative}
                 </p>
               </div>
 
