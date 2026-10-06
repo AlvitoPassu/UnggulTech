@@ -256,7 +256,17 @@ const SensorPage = () => {
               <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">10 data terbaru</span>
             </div>
             {soilPhChart.length ? (
-              <div className="h-[290px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={soilPhChart} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}><CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} /><Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} /><Line type="monotone" dataKey="soilPh" name="Soil pH Global" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} /></LineChart></ResponsiveContainer></div>
+              <div className="h-[290px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={soilPhChart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                    <Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} />
+                    <Line type="monotone" dataKey="soilPh" name="Soil pH Global" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             ) : <div className="flex h-[290px] items-center justify-center text-sm text-slate-400">Data pH belum tersedia.</div>}
           </section>
 
