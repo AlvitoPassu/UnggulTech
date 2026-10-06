@@ -232,6 +232,6 @@ void loop() {
   sendDataToServer(adcValue, pHValue);
   
   // 9. Jeda sebelum pengukuran berikutnya
-  // Anda bisa memperlama jeda ini (misal 1 menit / 60000ms) jika ingin menghemat daya.
-  delay(10000); 
+  // Jeda 55 detik + 5 detik warm-up sensor = siklus pengiriman tepat 1 menit (60 detik).
+  delay(55000); 
 }
