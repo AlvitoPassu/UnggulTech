@@ -7,7 +7,7 @@ const router = Router();
 
 router.get("/latest", async (req, res, next) => {
   try {
-    const rainfall = await getLatestRainfall(req.query);
+    const rainfall = await getLatestRainfall();
     return res.json(rainfall);
   } catch (error) {
     next(error);
@@ -16,7 +16,7 @@ router.get("/latest", async (req, res, next) => {
 
 router.get("/trend", async (req, res, next) => {
   try {
-    const trend = await getRainfallTrend(req.query.period || "7d", req.query);
+    const trend = await getRainfallTrend(req.query.period || "7d");
     return res.json(trend);
   } catch (error) {
     next(error);

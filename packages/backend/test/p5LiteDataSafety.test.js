@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { parseStrictFiniteNumber } from "../src/utils/strictNumber.js";
 import { createRainfallReading, parseRainfallValue, updateRainfallReading } from "../src/services/rainfallService.js";
-import { getScopedOperationalDecisions } from "../src/services/chatbotService.js";
+import { getGlobalOperationalDecisions } from "../src/services/chatbotService.js";
 import { insertSensorReadings, validateOptionalSensorMetric, validateSoilPh } from "../src/services/sensorService.js";
 import { config, supabase } from "../src/config/supabase.js";
 
@@ -40,6 +40,45 @@ test("P5 B-01: create dan update menolak rainfall invalid sebelum database write
     { message: "Tanggal dan waktu pengukuran tidak valid." },
     "rainfall yang tidak dikirim tidak divalidasi sebagai 0",
   );
+});
+
+test("P5 B-03: create dan update rainfall selalu menyimpan scope global", async () => {
+  let insertedRecord = null;
+  let updatedRecord = null;
+
+  await withSupabaseFromMock((table) => {
+    assert.equal(table, "rainfall_readings");
+    return {
+      insert: (record) => {
+        insertedRecord = record;
+        return { select: () => ({ single: async () => ({ data: record, error: null }) }) };
+      },
+      update: (record) => {
+        updatedRecord = record;
+        return { eq: () => ({ select: () => ({ maybeSingle: async () => ({ data: { id: 1, ...record }, error: null }) }) }) };
+      },
+    };
+  }, async () => {
+    await createRainfallReading({
+      rainfall_value: 10,
+      unit: "mm",
+      measured_at: "2026-10-06T08:00:00.000Z",
+      nursery: "Pre Nursery",
+      bedengan: "A1",
+    });
+    await updateRainfallReading(1, {
+      rainfall_value: 0,
+      measured_at: "2026-10-06T09:00:00.000Z",
+      nursery: "Main Nursery",
+      bedengan: "B1",
+    });
+  });
+
+  assert.equal(insertedRecord.nursery, null);
+  assert.equal(insertedRecord.bedengan, null);
+  assert.equal(updatedRecord.nursery, null);
+  assert.equal(updatedRecord.bedengan, null);
+  assert.equal(updatedRecord.rainfall_value, 0);
 });
 
 test("P5 H-01/H-02: parser strict menolak coercion boolean dan whitespace", () => {
@@ -151,64 +190,49 @@ test("P5 H-02: DHT optional yang absent tersimpan sebagai null, bukan nol", asyn
   });
 });
 
-test("P5 B-02: operational decision chatbot memakai rainfall scoped setiap sensor", async () => {
+test("P5 B-02: operational decision chatbot memakai rainfall global yang sama untuk setiap sensor", async () => {
   const calls = [];
-  const rainfallLookup = async (filters) => {
-    calls.push(filters);
-    if (filters.bedengan === "1") {
-      return {
-        available: true,
-        freshness: "fresh",
-        isFresh: true,
-        reading: { rainfall_value: 5, unit: "mm", measured_at: "2026-09-20T01:00:00.000Z" },
-      };
-    }
-    if (filters.bedengan === "2") {
-      return {
-        available: true,
-        freshness: "fresh",
-        isFresh: true,
-        reading: { rainfall_value: 15, unit: "mm", measured_at: "2026-09-20T01:00:00.000Z" },
-      };
-    }
-    return null;
+  const rainfallLookup = async (...args) => {
+    calls.push(args);
+    return {
+      available: true,
+      freshness: "fresh",
+      isFresh: true,
+      reading: { rainfall_value: 15, unit: "mm", measured_at: "2026-09-20T01:00:00.000Z" },
+    };
   };
   const sensors = [
     { location: "Nursery A", bedengan: "1", moisture: 20, sensorHealth: "online" },
     { location: "Nursery A", bedengan: "2", moisture: 20, sensorHealth: "online" },
   ];
 
-  const decisions = await getScopedOperationalDecisions(sensors, rainfallLookup);
+  const decisions = await getGlobalOperationalDecisions(sensors, rainfallLookup);
 
-  assert.deepEqual(calls, [
-    { nursery: "Nursery A", bedengan: "1" },
-    { nursery: "Nursery A", bedengan: "2" },
-  ]);
-  assert.equal(decisions[0].rainfall.value, 5);
-  assert.equal(decisions[0].decision.code, "water");
+  assert.deepEqual(calls, [[]]);
+  assert.equal(decisions[0].rainfall.value, 15);
+  assert.equal(decisions[0].decision.code, "no_watering");
   assert.equal(decisions[1].rainfall.value, 15);
   assert.equal(decisions[1].decision.code, "no_watering");
 });
 
-test("P5 B-02: rainfall bedengan lain atau metadata scope tidak menjadi fallback", async () => {
+test("P5 B-02: rainfall global bernilai nol tetap tersedia untuk semua sensor", async () => {
   const calls = [];
-  const rainfallLookup = async (filters) => {
-    calls.push(filters);
-    return filters.bedengan === "1"
-      ? { available: true, freshness: "fresh", isFresh: true, reading: { rainfall_value: 5, unit: "mm", measured_at: "2026-09-20T01:00:00.000Z" } }
-      : null;
+  const rainfallLookup = async (...args) => {
+    calls.push(args);
+    return { available: true, freshness: "fresh", isFresh: true, reading: { rainfall_value: 0, unit: "mm", measured_at: "2026-09-20T01:00:00.000Z" } };
   };
-  const decisions = await getScopedOperationalDecisions([
+  const decisions = await getGlobalOperationalDecisions([
     { location: "Nursery A", bedengan: "1", moisture: 20, sensorHealth: "online" },
     { location: "Nursery A", bedengan: "2", moisture: 20, sensorHealth: "online" },
     { location: null, bedengan: "3", moisture: 20, sensorHealth: "online" },
   ], rainfallLookup);
 
-  assert.equal(calls.length, 2);
+  assert.deepEqual(calls, [[]]);
   assert.equal(decisions[0].decision.code, "water");
-  assert.equal(decisions[1].rainfall.freshness, "missing");
-  assert.equal(decisions[1].decision.code, "rainfall_unavailable");
-  assert.equal(decisions[2].rainfall.freshness, "missing");
-  assert.equal(decisions[2].rainfallScope.available, false);
-  assert.equal(decisions[2].decision.code, "rainfall_unavailable");
+  assert.equal(decisions[1].rainfall.value, 0);
+  assert.equal(decisions[1].rainfall.freshness, "fresh");
+  assert.equal(decisions[1].decision.code, "water");
+  assert.equal(decisions[2].rainfall.value, 0);
+  assert.equal(decisions[2].rainfall.freshness, "fresh");
+  assert.equal(decisions[2].decision.code, "water");
 });

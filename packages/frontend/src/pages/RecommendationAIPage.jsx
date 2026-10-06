@@ -34,18 +34,6 @@ import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
 const panelClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
 const STORAGE_KEY = "unggul-ai-recommendation-history";
 
-// `all` means the rainfall API must receive no location filter.  Keep this
-// separate from sensor selection: selecting a fallback sensor must never turn
-// an unfiltered rainfall request into a request for that sensor's nursery.
-const getRainfallFilters = (nursery, bedengan) => ({
-  nursery: nursery && nursery !== "all" ? nursery : undefined,
-  bedengan: bedengan && bedengan !== "all" ? bedengan : undefined,
-});
-
-const getRainfallSelection = (value) => (
-  value === null || value === undefined || value === "" ? "all" : String(value)
-);
-
 const getLocalDate = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -327,10 +315,8 @@ const RecommendationAIPage = () => {
     const fetchRainfall = async () => {
       setRainfallLoading(true);
       setRainfallError("");
-      const filters = getRainfallFilters(selectedNursery, selectedBedengan);
-
       try {
-        const rainfallSeries = await getRainfallTrend(selectedPeriod, filters);
+        const rainfallSeries = await getRainfallTrend(selectedPeriod);
         if (isCurrent && requestId === rainfallRequestId.current) {
           setRainfallTrend(Array.isArray(rainfallSeries) ? rainfallSeries : []);
         }
@@ -348,7 +334,7 @@ const RecommendationAIPage = () => {
     return () => {
       isCurrent = false;
     };
-  }, [rainfallRefreshVersion, refreshToken, selectedBedengan, selectedNursery, selectedPeriod]);
+  }, [rainfallRefreshVersion, refreshToken, selectedPeriod]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -427,7 +413,7 @@ const RecommendationAIPage = () => {
   const doSaveRainfall = async (inputValue, measuredAt) => {
     setRainfallSaving(true);
     try {
-      const result = await createRainfallReading({
+      await createRainfallReading({
         rainfall_value: inputValue,
         unit: "mm",
         measured_at: measuredAt.toISOString(),
@@ -438,8 +424,6 @@ const RecommendationAIPage = () => {
       rainfallRequestId.current += 1;
       setRainfallLoading(false);
       setRainfallRefreshVersion((version) => version + 1);
-      setSelectedNursery(getRainfallSelection(result.reading?.nursery));
-      setSelectedBedengan(getRainfallSelection(result.reading?.bedengan));
       setRainfallForm((current) => ({ ...current, rainfall_value: "", notes: "" }));
       setRainfallMessage({ type: "success", text: "Pengukuran curah hujan berhasil disimpan." });
     } catch (submitError) {
@@ -594,12 +578,13 @@ const RecommendationAIPage = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><FiCloudRain className="text-lg" aria-hidden="true" /></div>
             <div><h2 className="text-base font-bold text-slate-900">Input Curah Hujan</h2><p className="mt-1 text-xs text-slate-500">Masukkan hasil pembacaan aktual tabung ombrometer.</p></div>
           </div>
-          <form onSubmit={handleRainfallSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="text-sm font-medium text-slate-700">Curah Hujan<input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">Satuan: mm</span></label>
-            <label className="text-sm font-medium text-slate-700">Tanggal Pengukuran<input required type="date" value={rainfallForm.measured_date} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_date: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
-            <label className="text-sm font-medium text-slate-700">Waktu Pengukuran<input required type="time" value={rainfallForm.measured_time} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_time: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
-            <label className="text-sm font-medium text-slate-700 md:col-span-2">Catatan opsional<textarea value={rainfallForm.notes} onChange={(event) => setRainfallForm((current) => ({ ...current, notes: event.target.value }))} rows="2" className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
-            <div className="flex items-end"><button type="submit" disabled={rainfallSaving} className="w-full rounded-md bg-[#1DAADF] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1686b3] disabled:cursor-not-allowed disabled:opacity-60">{rainfallSaving ? "Menyimpan..." : "Simpan Pengukuran"}</button></div>
+          <form onSubmit={handleRainfallSubmit} className="w-full space-y-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">Nilai Curah Hujan<div className="relative mt-2"><input required min="0" step="0.1" type="number" value={rainfallForm.rainfall_value} onChange={(event) => setRainfallForm((current) => ({ ...current, rainfall_value: event.target.value }))} className="w-full rounded-md border border-slate-300 px-3 py-2 pr-14 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" placeholder="2.5" /><span className="pointer-events-none absolute inset-y-0 right-0 flex items-center border-l border-slate-200 px-3 text-sm font-medium text-slate-500">mm</span></div></label>
+              <div className="grid gap-5 sm:grid-cols-2"><label className="text-sm font-medium text-slate-700">Tanggal Pengukuran<input required type="date" value={rainfallForm.measured_date} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_date: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label><label className="text-sm font-medium text-slate-700">Waktu Pengukuran<input required type="time" value={rainfallForm.measured_time} onChange={(event) => setRainfallForm((current) => ({ ...current, measured_time: event.target.value }))} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label></div>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">Catatan <span className="font-normal text-slate-500">(opsional)</span><textarea value={rainfallForm.notes} onChange={(event) => setRainfallForm((current) => ({ ...current, notes: event.target.value }))} rows="3" placeholder="Tambahkan catatan jika diperlukan" className="mt-2 w-full resize-y rounded-md border border-slate-300 px-3 py-2 font-normal outline-none focus:border-[#1DAADF] focus:ring-2 focus:ring-[#d1f0fa]" /></label>
+            </div>
+            <div className="flex justify-end pt-1"><button type="submit" disabled={rainfallSaving} className="w-full rounded-md bg-[#1DAADF] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1686b3] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">{rainfallSaving ? "Menyimpan..." : "Simpan Pengukuran"}</button></div>
           </form>
           {rainfallMessage.text && <p className={`mt-4 rounded-md px-3 py-2 text-sm ${rainfallMessage.type === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{rainfallMessage.text}</p>}
         </section>

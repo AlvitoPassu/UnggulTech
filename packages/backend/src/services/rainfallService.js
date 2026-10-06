@@ -16,13 +16,6 @@ export const parseRainfallValue = (rawValue) => {
   return rainfallValue;
 };
 
-const applyLocationFilters = (query, { nursery, bedengan } = {}) => {
-  let filteredQuery = query;
-  if (nursery) filteredQuery = filteredQuery.eq("nursery", nursery);
-  if (bedengan) filteredQuery = filteredQuery.eq("bedengan", bedengan);
-  return filteredQuery;
-};
-
 export const getRainfallFreshness = (reading, now = new Date()) => {
   if (!reading) return { freshness: "missing", isFresh: false };
 
@@ -40,8 +33,8 @@ export const getRainfallFreshness = (reading, now = new Date()) => {
   return { freshness: isFresh ? "fresh" : "stale", isFresh };
 };
 
-export async function getLatestRainfall(filters = {}) {
-  let query = supabase
+export async function getLatestRainfall() {
+  const query = supabase
     .from("rainfall_readings")
     .select(rainfallSelect)
     .order("measured_at", { ascending: false })
@@ -49,7 +42,6 @@ export async function getLatestRainfall(filters = {}) {
     .limit(1)
     .maybeSingle();
 
-  query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
   return { available: Boolean(data), reading: withMillimeterUnit(data), ...getRainfallFreshness(data) };
@@ -57,30 +49,28 @@ export async function getLatestRainfall(filters = {}) {
 
 export async function getRainfallHistory(filters = {}) {
   const limit = Math.min(Math.max(Number(filters.limit) || 50, 1), 100);
-  let query = supabase
+  const query = supabase
     .from("rainfall_readings")
     .select(rainfallSelect)
     .order("measured_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(withMillimeterUnit);
 }
 
-export async function getRainfallTrend(period = "7d", filters = {}) {
+export async function getRainfallTrend(period = "7d") {
   const validPeriod = ["1d", "7d", "30d"].includes(period) ? period : "7d";
   const periodDays = validPeriod === "1d" ? 1 : validPeriod === "7d" ? 7 : 30;
   const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
-  let query = supabase
+  const query = supabase
     .from("rainfall_readings")
     .select("rainfall_value, measured_at")
     .gte("measured_at", since)
     .order("measured_at", { ascending: true });
 
-  query = applyLocationFilters(query, filters);
   const { data, error } = await query;
   if (error) throw error;
 
@@ -122,11 +112,9 @@ export async function createRainfallReading(payload = {}) {
     throw error;
   }
 
-  const nursery = payload.nursery ? String(payload.nursery).trim() : null;
-  const bedengan = payload.bedengan === null || payload.bedengan === undefined || payload.bedengan === "" ? null : String(payload.bedengan).trim();
   const { data, error } = await supabase
     .from("rainfall_readings")
-    .insert({ nursery, bedengan, rainfall_value: rainfallValue, unit: "mm", measured_at: measuredAt.toISOString(), source: "ombrometer", notes: payload.notes ? String(payload.notes).trim() : null })
+    .insert({ nursery: null, bedengan: null, rainfall_value: rainfallValue, unit: "mm", measured_at: measuredAt.toISOString(), source: "ombrometer", notes: payload.notes ? String(payload.notes).trim() : null })
     .select(rainfallSelect)
     .single();
 
@@ -151,10 +139,8 @@ export async function updateRainfallReading(id, payload = {}) {
     throw error;
   }
 
-  const nursery = payload.nursery ? String(payload.nursery).trim() : null;
-  const bedengan = payload.bedengan === null || payload.bedengan === undefined || payload.bedengan === "" ? null : String(payload.bedengan).trim();
   const notes = payload.notes === null || payload.notes === undefined || String(payload.notes).trim() === "" ? null : String(payload.notes).trim();
-  const updatePayload = { nursery, bedengan, measured_at: measuredAt.toISOString(), notes };
+  const updatePayload = { nursery: null, bedengan: null, measured_at: measuredAt.toISOString(), notes };
   if (hasRainfallValue) updatePayload.rainfall_value = rainfallValue;
 
   const { data, error } = await supabase
