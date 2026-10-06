@@ -9,10 +9,7 @@ import { getSensorData } from "./sensorService.js";
 export async function getRecommendationForSensor(sensorId) {
   const sensorData = await getSensorData(sensorId);
   const sensor = sensorData.sensor ?? {};
-  const rainfall = await getLatestRainfall({
-    nursery: sensor.location || undefined,
-    bedengan: sensor.bedengan || undefined,
-  });
+  const rainfall = await getLatestRainfall();
 
   return {
     sensor: {
