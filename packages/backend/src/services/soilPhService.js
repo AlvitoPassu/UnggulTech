@@ -1,12 +1,12 @@
 import { supabase } from "../config/supabase.js";
 import { parseStrictFiniteNumber } from "../utils/strictNumber.js";
 
-// The pH firmware transmits approximately every 10 seconds. Ninety seconds
-// tolerates intermittent Wi-Fi while still marking a disconnected probe quickly.
-const configuredPhActiveThreshold = Number(process.env.PH_ACTIVE_THRESHOLD_SECONDS || 90);
+// The pH firmware transmits every 1 minute. 180 seconds (3 minutes)
+// tolerates intermittent Wi-Fi while matching the soil moisture sensor threshold.
+const configuredPhActiveThreshold = Number(process.env.PH_ACTIVE_THRESHOLD_SECONDS || 180);
 export const PH_ACTIVE_THRESHOLD_SECONDS = Number.isFinite(configuredPhActiveThreshold) && configuredPhActiveThreshold > 0
   ? configuredPhActiveThreshold
-  : 90;
+  : 180;
 
 const normalizePh = (value) => {
   const parsed = parseStrictFiniteNumber(value);
@@ -80,14 +80,14 @@ export async function getSoilPhHistory(limit = 100) {
   const { data, error } = await supabase
     .from("soil_ph_readings")
     .select("id, ph_value, measured_at")
-    .order("measured_at", { ascending: true })
+    .order("measured_at", { ascending: false })
     .limit(safeLimit);
 
   if (error) {
     if (isMissingSoilPhTable(error)) return [];
     throw error;
   }
-  return (data ?? []).map((reading) => ({
+  return (data ?? []).reverse().map((reading) => ({
     id: reading.id,
     soilPh: Number(reading.ph_value),
     measuredAt: reading.measured_at,
