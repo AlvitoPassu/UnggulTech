@@ -146,33 +146,66 @@ export async function sendXlsx(res, rows, startDate, endDate, globalSoilPh = {})
 }
 
 export function sendPdf(res, rows, startDate, endDate, globalSoilPh = {}) {
-  const document = new PDFDocument({ margin: 36, bottomMargin: 54, size: "A4", layout: "landscape" });
+  const pageOptions = { margins: { top: 36, right: 36, bottom: 56, left: 36 }, size: "A4", layout: "landscape" };
+  const document = new PDFDocument({ ...pageOptions, bufferPages: true });
   const summary = getSummary(rows);
+  const createdAt = formatWitaTimestamp(new Date());
   const dateRange = startDate === endDate
     ? witaDateFormatter.format(new Date(`${startDate}T00:00:00+08:00`))
     : `${witaDateFormatter.format(new Date(`${startDate}T00:00:00+08:00`))} - ${witaDateFormatter.format(new Date(`${endDate}T00:00:00+08:00`))}`;
   const tableWidth = document.page.width - document.page.margins.left - document.page.margins.right;
-  const columnWidths = [28, 104, 74, 70, 82, 82, 72, 66, 66];
-  const tableHeaders = reportColumns.map(({ header }) => header);
-  const drawFooter = () => {
-    document.save();
-    document.fontSize(8).fillColor("#64748b").text("Laporan dibuat oleh Smart Soil Monitoring System", document.page.margins.left, document.page.height - 32, { lineBreak: false });
-    document.text(`Halaman ${document.bufferedPageRange().count}`, document.page.width - 100, document.page.height - 32, { width: 64, align: "right", lineBreak: false });
-    document.restore();
+  const pageWidth = document.page.width;
+  const pageHeight = document.page.height;
+  const left = document.page.margins.left;
+  const padding = 6;
+  const fontSize = 9;
+  // PDF widths are independent of the shared CSV/Excel column definitions.
+  const columnWeights = [40, 116, 130, 75, 90, 90, 80, 74, 74];
+  const totalWeight = columnWeights.reduce((total, width) => total + width, 0);
+  const columnWidths = columnWeights.map((width) => tableWidth * width / totalWeight);
+  const tableHeaders = reportColumns.map(({ header }) => header.replace(/ \(/, "\n("));
+  const cellOptions = (width, align = "left") => ({ width: width - padding * 2, align, lineGap: 1 });
+  const measureCells = (values, bold = false) => {
+    document.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize);
+    const heights = values.map((value, index) => document.heightOfString(String(value), cellOptions(columnWidths[index])));
+    return { heights, height: Math.max(26, ...heights.map((height) => height + padding * 2)) };
   };
-  const drawTableHeader = () => {
-    const startX = document.page.margins.left;
+  const headerLayout = measureCells(tableHeaders, true);
+  const drawCells = (values, layout, bold = false) => {
     const startY = document.y;
-    document.save();
-    document.rect(startX, startY, tableWidth, 25).fill("#1686b3");
-    document.fillColor("white").font("Helvetica-Bold").fontSize(7);
-    let x = startX;
-    tableHeaders.forEach((header, index) => {
-      document.text(header, x + 3, startY + 8, { width: columnWidths[index] - 6, align: "center", lineBreak: false });
+    let x = left;
+    document.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize).fillColor(bold ? "#ffffff" : "#334155");
+    values.forEach((value, index) => {
+      const align = bold ? "center" : reportColumns[index].align || "left";
+      document.text(String(value), x + padding, startY + (layout.height - layout.heights[index]) / 2, cellOptions(columnWidths[index], align));
       x += columnWidths[index];
     });
-    document.restore();
-    document.y = startY + 25;
+    // Wrapping a cell must not move the next cell or the start of the next row.
+    document.x = left;
+    document.y = startY + layout.height;
+  };
+  const drawTableHeader = () => {
+    document.rect(left, document.y, tableWidth, headerLayout.height).fill("#1DAADF");
+    drawCells(tableHeaders, headerLayout, true);
+  };
+  const ensureSpace = (height, monitoring = false) => {
+    if (document.y + height <= document.page.height - document.page.margins.bottom) return;
+    const title = "Laporan Data Monitoring Tanah";
+    const subtitle = `Smart Soil Monitoring System | Periode: ${dateRange} (WITA)`;
+    document.font("Helvetica-Bold").fontSize(11);
+    const titleHeight = document.heightOfString(title, { width: tableWidth });
+    document.font("Helvetica").fontSize(fontSize);
+    const subtitleHeight = document.heightOfString(subtitle, { width: tableWidth });
+    const requiredHeight = pageOptions.margins.top + titleHeight + subtitleHeight + 12 + height + pageOptions.margins.bottom + (monitoring ? headerLayout.height : 0);
+    // An exceptionally long cell gets a taller page, keeping all text and the row intact.
+    // Normal reports use consistent A4 landscape pages at the same readable font size.
+    document.addPage(requiredHeight > pageHeight
+      ? { ...pageOptions, size: [pageWidth, requiredHeight + 1], layout: "portrait" }
+      : pageOptions);
+    document.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text(title, left, document.page.margins.top, { width: tableWidth });
+    document.font("Helvetica").fontSize(fontSize).fillColor("#64748b").text(subtitle, { width: tableWidth });
+    document.y += 12;
+    if (monitoring) drawTableHeader();
   };
   const drawTableRow = (row) => {
     const values = [
@@ -180,39 +213,81 @@ export function sendPdf(res, rows, startDate, endDate, globalSoilPh = {}) {
       displayValue(row.moisture), displayValue(row.temperature, 1),
       displayValue(row.humidity), row.status, row.pump,
     ];
-    const startX = document.page.margins.left;
+    const layout = measureCells(values);
+    ensureSpace(layout.height, true);
     const startY = document.y;
-    document.save();
-    document.rect(startX, startY, tableWidth, 23).fill(row.number % 2 === 0 ? "#f8fafc" : "#ffffff");
-    document.strokeColor("#cbd5e1").lineWidth(0.4).rect(startX, startY, tableWidth, 23).stroke();
-    document.fillColor("#334155").font("Helvetica").fontSize(7);
-    let x = startX;
-    values.forEach((value, index) => {
-      document.text(String(value), x + 3, startY + 8, { width: columnWidths[index] - 6, align: reportColumns[index].align || "left", lineBreak: false, ellipsis: true });
-      x += columnWidths[index];
+    document.rect(left, startY, tableWidth, layout.height).fill(row.number % 2 === 0 ? "#f4f9fc" : "#ffffff");
+    document.strokeColor("#dbe5ec").lineWidth(0.4).rect(left, startY, tableWidth, layout.height).stroke();
+    let x = left;
+    columnWidths.slice(0, -1).forEach((width) => {
+      x += width;
+      document.moveTo(x, startY).lineTo(x, startY + layout.height).stroke();
     });
-    document.restore();
-    document.y = startY + 23;
+    drawCells(values, layout);
+  };
+  const drawSummary = () => {
+    const summaryItems = [
+      ["Sensor", rows[0]?.sensor || "-"],
+      ["Jumlah data", String(summary.count)],
+      ["Periode pengukuran (WITA)", dateRange],
+      ["Rata-rata Soil Moisture", `${displayValue(summary.averageMoisture)}%`],
+      ["Rata-rata Temperature", `${displayValue(summary.averageTemperature, 1)} °C`],
+      ["Global Soil pH", `${displayValue(globalSoilPh.soilPh)}\nPengukuran terakhir: ${globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"}`],
+    ];
+    const width = tableWidth / 3;
+    for (let index = 0; index < summaryItems.length; index += 3) {
+      const items = summaryItems.slice(index, index + 3);
+      document.font("Helvetica-Bold").fontSize(fontSize);
+      const labelHeight = Math.max(...items.map(([label]) => document.heightOfString(label, cellOptions(width))));
+      document.font("Helvetica").fontSize(10);
+      const valueHeight = Math.max(...items.map(([, value]) => document.heightOfString(value, cellOptions(width))));
+      const height = labelHeight + valueHeight + padding * 2 + 5;
+      ensureSpace(height);
+      const startY = document.y;
+      items.forEach(([label, value], column) => {
+        const x = left + width * column;
+        document.rect(x, startY, width, height).fill("#f4f9fc");
+        document.strokeColor("#dbe5ec").lineWidth(0.4).rect(x, startY, width, height).stroke();
+        document.font("Helvetica-Bold").fontSize(fontSize).fillColor("#475569").text(label, x + padding, startY + padding, cellOptions(width));
+        document.font("Helvetica").fontSize(10).fillColor("#0f172a").text(value, x + padding, startY + padding + labelHeight + 5, cellOptions(width));
+      });
+      document.x = left;
+      document.y = startY + height;
+    }
+  };
+  const drawFooters = () => {
+    const { start, count } = document.bufferedPageRange();
+    for (let index = start; index < start + count; index += 1) {
+      document.switchToPage(index);
+      const footerY = document.page.height - 33;
+      document.strokeColor("#cbd5e1").lineWidth(0.5).moveTo(left, footerY - 9).lineTo(left + tableWidth, footerY - 9).stroke();
+      document.font("Helvetica").fontSize(8).fillColor("#64748b")
+        .text("Unggul Monitoring | Laporan dihasilkan oleh Smart Soil Monitoring System", left, footerY, { lineBreak: false });
+      // Passing a width enables PDFKit's wrapper even with lineBreak: false,
+      // which would add blank pages when writing inside the reserved bottom margin.
+      const pageLabel = `Halaman ${index - start + 1} dari ${count}`;
+      document.text(pageLabel, left + tableWidth - document.widthOfString(pageLabel), footerY, { lineBreak: false });
+    }
   };
 
   res.type("application/pdf");
   document.pipe(res);
-  document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(18).text("Laporan Data Monitoring Tanah", { align: "center" });
-  document.fillColor("#475569").font("Helvetica").fontSize(10).text("Smart Soil Monitoring System", { align: "center" });
-  document.fontSize(9).text(`Periode data: ${dateRange} (WITA)`, { align: "center" }).moveDown(1);
-  document.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text("Ringkasan Data");
-  document.font("Helvetica").fontSize(9).fillColor("#334155").text(`Sensor: ${rows[0]?.sensor || "-"}    |    Jumlah data: ${summary.count}    |    Dibuat: ${formatWitaTimestamp(new Date())}`);
-  document.text(`Rata-rata Soil Moisture: ${displayValue(summary.averageMoisture)}%    |    Global Soil pH: ${displayValue(globalSoilPh.soilPh)} (terakhir: ${globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"})    |    Rata-rata Temperature: ${displayValue(summary.averageTemperature, 1)} °C`).moveDown(1);
-  document.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text("Data Monitoring").moveDown(0.4);
+  document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(18).text("Laporan Data Monitoring Tanah", left, document.page.margins.top, { width: tableWidth, align: "center" });
+  document.y += 4;
+  document.fillColor("#475569").font("Helvetica").fontSize(11).text("Smart Soil Monitoring System", { width: tableWidth, align: "center" });
+  document.y += 8;
+  document.fontSize(fontSize).text(`Periode data: ${dateRange} (WITA)`, { width: tableWidth, align: "center" });
+  document.text(`Dibuat pada: ${createdAt}`, { width: tableWidth, align: "center" });
+  document.y += 16;
+  document.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text("Ringkasan Data", { width: tableWidth });
+  document.y += 6;
+  drawSummary();
+  document.y += 16;
+  ensureSpace(20 + headerLayout.height + 26);
+  document.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text("Data Monitoring", { width: tableWidth });
+  document.y += 6;
   drawTableHeader();
-  rows.forEach((row) => {
-    if (document.y + 23 > document.page.height - document.page.margins.bottom) {
-      drawFooter();
-      document.addPage();
-      drawTableHeader();
-    }
-    drawTableRow(row);
-  });
-  drawFooter();
+  rows.forEach(drawTableRow);
+  drawFooters();
   document.end();
 }
