@@ -18,6 +18,25 @@ const sampleRows = reportRows([{
 
 const globalSoilPh = { soilPh: 6.4, measuredAt: "2026-09-25T08:00:00.000Z", status: "active", isActive: true };
 
+const exportXlsx = async (rows, ph = globalSoilPh, endDate = "2026-09-25") => {
+  let buffer;
+  await sendXlsx({ type: (type) => {
+    assert.equal(type, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return { send: (value) => { buffer = value; } };
+  } }, rows, "2026-09-25", endDate, ph);
+  assert.ok(Buffer.isBuffer(buffer));
+  assert.equal(buffer.subarray(0, 2).toString(), "PK");
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  return workbook;
+};
+
+const summaryValue = (sheet, label) => {
+  let value;
+  sheet.eachRow((row) => { if (row.getCell(1).value === label) value = row.getCell(2).value; });
+  return value;
+};
+
 const exportPdf = async (rows, ph = globalSoilPh, endDate = "2026-09-25") => {
   const response = new PassThrough();
   response.type = (type) => { assert.equal(type, "application/pdf"); return response; };
@@ -176,7 +195,7 @@ test("exports keep global pH metadata separate from moisture rows", { concurrenc
   await sendXlsx({ type: () => ({ send: (value) => { xlsxBuffer = value; } }) }, sampleRows, "2026-09-25", "2026-09-25", globalSoilPh);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(xlsxBuffer);
-  assert.equal(workbook.getWorksheet("Ringkasan").getCell("A7").value, "Global Soil pH");
+  assert.equal(summaryValue(workbook.getWorksheet("Ringkasan"), "Global Soil pH"), globalSoilPh.soilPh);
 
   const pdfResponse = new PassThrough();
   pdfResponse.type = () => pdfResponse;
@@ -186,4 +205,201 @@ test("exports keep global pH metadata separate from moisture rows", { concurrenc
   sendPdf(pdfResponse, sampleRows, "2026-09-25", "2026-09-25", globalSoilPh);
   await finished;
   assert.ok(Buffer.concat(chunks).subarray(0, 4).equals(Buffer.from("%PDF")));
+});
+
+test("XLSX keeps two sheets and a readable two-column summary with exact statistics", async () => {
+  const rows = [
+    { ...sampleRows[0], moisture: 98.8123456789, temperature: 28.123456789 },
+    { ...sampleRows[0], number: 2, moisture: 40.23456789, temperature: 22.987654321 },
+  ];
+  const ph = { ...globalSoilPh, soilPh: 6.456789123 };
+  const original = structuredClone({ rows, ph });
+  const workbook = await exportXlsx(rows, ph, "2026-10-08");
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Ringkasan", "Data Monitoring"]);
+  const sheet = workbook.getWorksheet("Ringkasan");
+  assert.equal(sheet.columnCount, 2);
+  assert.deepEqual(sheet.model.merges, ["A1:B1", "A2:B2"]);
+  assert.equal(sheet.getCell("A1").value, "Laporan Data Monitoring Tanah");
+  assert.equal(sheet.getCell("A2").value, "Smart Soil Monitoring System");
+  [1, 2, 4].forEach((row) => {
+    assert.equal(sheet.getCell(`A${row}`).fill.fgColor.argb, "FF1DAADF");
+    assert.equal(sheet.getCell(`A${row}`).font.color.argb, "FFFFFFFF");
+    assert.equal(sheet.getCell(`B${row}`).font.color.argb, "FFFFFFFF");
+  });
+  assert.equal(sheet.getCell("A1").font.bold, true);
+  assert.equal(sheet.getCell("A1").font.size, 20);
+  assert.ok(sheet.getRow(1).height >= 36);
+  assert.ok(sheet.getColumn(1).width >= 34);
+  assert.ok(sheet.getColumn(2).width >= 40);
+  assert.equal(summaryValue(sheet, "Nama sistem"), "Smart Soil Monitoring System");
+  assert.equal(summaryValue(sheet, "Periode data"), "2026-09-25 sampai 2026-10-08");
+  assert.equal(summaryValue(sheet, "Sensor"), rows[0].sensor);
+  assert.equal(summaryValue(sheet, "Jumlah data"), rows.length);
+  assert.equal(summaryValue(sheet, "Rata-rata Soil Moisture (%)"), (rows[0].moisture + rows[1].moisture) / 2);
+  assert.equal(summaryValue(sheet, "Rata-rata Temperature (°C)"), (rows[0].temperature + rows[1].temperature) / 2);
+  assert.equal(summaryValue(sheet, "Global Soil pH"), ph.soilPh);
+  assert.equal(summaryValue(sheet, "Pengukuran pH terakhir").toISOString(), "2026-09-25T16:00:00.000Z");
+  assert.ok(summaryValue(sheet, "Dibuat pada") instanceof Date);
+  for (let row = 5; row <= 13; row += 1) {
+    assert.equal(sheet.getCell(`A${row}`).alignment.horizontal, "left");
+    assert.equal(sheet.getCell(`B${row}`).alignment.horizontal, [8, 9, 10, 12].includes(row) ? "right" : "left");
+    assert.equal(sheet.getCell(`A${row}`).border.bottom.style, "thin");
+  }
+  assert.equal(sheet.getCell("B8").numFmt, "#,##0");
+  assert.equal(sheet.getCell("B9").numFmt, "0.00");
+  assert.equal(sheet.getCell("B10").numFmt, "0.00");
+  assert.equal(sheet.getCell("B12").numFmt, "0.0");
+  assert.equal(sheet.views[0].showGridLines, false);
+  assert.equal(sheet.pageSetup.printArea, "A1:B13");
+  assert.equal(sheet.pageSetup.fitToWidth, 1);
+  assert.deepEqual({ rows, ph }, original);
+});
+
+test("XLSX table preserves values, missing measurements, filters, frozen headers and print setup", async () => {
+  const rows = [
+    { ...sampleRows[0], moisture: 98.8123456789, temperature: 28.123456789, humidity: 72.987654321 },
+    { ...sampleRows[0], number: 2, moisture: null, temperature: undefined, humidity: "", timestamp: "", pump: "" },
+    { ...sampleRows[0], number: 3, moisture: 0, temperature: 0, humidity: 0 },
+  ];
+  const original = structuredClone(rows);
+  const workbook = await exportXlsx(rows);
+  const sheet = workbook.getWorksheet("Data Monitoring");
+  assert.equal(sheet.rowCount, rows.length + 1);
+  assert.equal(sheet.columnCount, 9);
+  assert.deepEqual(sheet.getRow(1).values.slice(1), ["No", "Waktu (WITA)", "Sensor", "Bedengan",
+    "Soil Moisture (%)", "Temperature (°C)", "Humidity (%)", "Status", "Pump"]);
+  assert.deepEqual(sheet.model.merges, []);
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = sheet.getRow(index + 2);
+    assert.equal(row.getCell(1).value, rows[index].number);
+    ["sensor", "bedengan", "status", "pump"].forEach((key, position) => {
+      assert.equal(row.getCell([3, 4, 8, 9][position]).value, rows[index][key]);
+    });
+    ["moisture", "temperature", "humidity"].forEach((key, position) => {
+      const value = row.getCell(position + 5).value;
+      assert.equal(value, rows[index][key] === null ? "-" : rows[index][key] ?? null);
+      assert.equal(row.getCell(position + 5).numFmt, position === 1 ? "0.0" : "0.00");
+      assert.equal(row.getCell(position + 5).alignment.horizontal, "right");
+      assert.ok(!row.getCell(position + 5).numFmt.includes("%"));
+    });
+    row.eachCell((cell) => {
+      assert.equal(cell.border.bottom.style, "thin");
+      assert.equal(cell.fill.fgColor.argb, index % 2 ? "FFF0F9FD" : "FFFFFFFF");
+      assert.equal(cell.alignment.vertical, "middle");
+    });
+  }
+  assert.equal(sheet.getCell("B2").value.toISOString(), "2026-09-25T16:00:00.000Z");
+  assert.equal(sheet.getCell("B2").numFmt, 'dd/mm/yyyy hh:mm:ss "WITA"');
+  assert.equal(sheet.getCell("B3").value, "");
+  sheet.getRow(1).eachCell((cell) => {
+    assert.equal(cell.fill.fgColor.argb, "FF1DAADF");
+    assert.equal(cell.font.color.argb, "FFFFFFFF");
+    assert.equal(cell.font.bold, true);
+    assert.equal(cell.alignment.horizontal, "center");
+  });
+  const table = sheet.getTable("DataMonitoring");
+  assert.equal(table.table.tableRef, "A1:I4");
+  assert.equal(table.table.autoFilterRef, "A1:I4");
+  for (let index = 0; index < 9; index += 1) assert.equal(table.getColumn(index).filterButton, true);
+  assert.equal(sheet.views[0].state, "frozen");
+  assert.equal(sheet.views[0].ySplit, 1);
+  assert.equal(sheet.views[0].topLeftCell, "A2");
+  assert.equal(sheet.pageSetup.orientation, "landscape");
+  assert.equal(sheet.pageSetup.paperSize, 9);
+  assert.equal(sheet.pageSetup.fitToPage, true);
+  assert.equal(sheet.pageSetup.fitToWidth, 1);
+  assert.equal(sheet.pageSetup.fitToHeight, 0);
+  assert.equal(sheet.pageSetup.printArea, "A1:I4");
+  assert.equal(sheet.pageSetup.printTitlesRow, "1:1");
+  assert.deepEqual(rows, original);
+});
+
+test("XLSX exports empty datasets without replacing absent values with zero", async () => {
+  const workbook = await exportXlsx([], {});
+  const summary = workbook.getWorksheet("Ringkasan");
+  assert.equal(summaryValue(summary, "Jumlah data"), 0);
+  ["Sensor", "Rata-rata Soil Moisture (%)", "Global Soil pH", "Pengukuran pH terakhir", "Rata-rata Temperature (°C)"]
+    .forEach((label) => assert.equal(summaryValue(summary, label), "-"));
+  assert.equal(summaryValue(summary, "Periode data"), "2026-09-25");
+  const sheet = workbook.getWorksheet("Data Monitoring");
+  assert.equal(sheet.rowCount, 1);
+  assert.equal(sheet.getTable("DataMonitoring").table.tableRef, "A1:I1");
+});
+
+test("XLSX WITA dates stay sortable and preserve the clock across UTC date boundaries", async () => {
+  const logs = ["2026-09-24T16:00:00.000Z", "2026-09-25T15:59:59.000Z", "2026-09-25T16:00:00.000Z"]
+    .map((created_at, index) => ({ sensor_id: 1, created_at, moisture: 98.8, temperature: 28.5, humidity: 70, id: index + 1 }));
+  const rows = reportRows(logs);
+  const original = structuredClone(logs);
+  const workbook = await exportXlsx(rows, { soilPh: 0, measuredAt: logs[0].created_at });
+  const sheet = workbook.getWorksheet("Data Monitoring");
+  ["2026-09-25T00:00:00.000Z", "2026-09-25T23:59:59.000Z", "2026-09-26T00:00:00.000Z"]
+    .forEach((expected, index) => assert.equal(sheet.getCell(`B${index + 2}`).value.toISOString(), expected));
+  assert.ok(sheet.getCell("B2").value < sheet.getCell("B3").value);
+  assert.ok(sheet.getCell("B3").value < sheet.getCell("B4").value);
+  assert.equal(sheet.getCell("E2").value, 98.8);
+  assert.equal(sheet.getCell("E2").numFmt, "0.00");
+  assert.equal(summaryValue(workbook.getWorksheet("Ringkasan"), "Global Soil pH"), 0);
+  assert.deepEqual(logs, original);
+});
+
+test("XLSX sizes long labels and identifiers with wrapping instead of truncating content", async () => {
+  const rows = [{ ...sampleRows[0],
+    sensor: "Sensor nursery utara dengan nama panjang untuk verifikasi pembungkusan teks lengkap",
+    bedengan: "Bedengan-" + "0123456789".repeat(8),
+    pump: "Pompa aktif dengan keterangan panjang dan tetap terbaca",
+  }];
+  const workbook = await exportXlsx(rows);
+  const sheet = workbook.getWorksheet("Data Monitoring");
+  [3, 4, 9].forEach((column, index) => {
+    const cell = sheet.getRow(2).getCell(column);
+    assert.equal(cell.value, rows[0][["sensor", "bedengan", "pump"][index]]);
+    assert.equal(cell.alignment.wrapText, true);
+    assert.ok(sheet.getColumn(column).width >= 18);
+    assert.ok(sheet.getRow(2).height >= 68);
+  });
+  const summary = workbook.getWorksheet("Ringkasan");
+  assert.equal(summaryValue(summary, "Sensor"), rows[0].sensor);
+  assert.ok(summary.getRow(7).height >= 40);
+  assert.equal(summary.getCell("B7").alignment.wrapText, true);
+});
+
+test("XLSX round-trips 5000 rows with identical counts, order, measurements and summary calculations", async () => {
+  const rows = Array.from({ length: 5000 }, (_, index) => ({
+    ...sampleRows[0], number: index + 1, sensor: `Sensor ${index % 10 + 1}`, bedengan: `Bedengan ${index % 10 + 1}`,
+    moisture: index % 7 ? 98.8123456789 - index / 1000 : null,
+    temperature: index % 11 ? 28.123456789 + index / 1000 : null,
+    humidity: index % 13 ? 72.987654321 : null, pump: index % 2 ? "On" : "Off",
+  }));
+  const original = structuredClone(rows);
+  const workbook = await exportXlsx(rows);
+  const sheet = workbook.getWorksheet("Data Monitoring");
+  assert.equal(sheet.rowCount - 1, rows.length);
+  assert.equal(sheet.getTable("DataMonitoring").table.autoFilterRef, "A1:I5001");
+  rows.forEach((expected, index) => {
+    const actual = sheet.getRow(index + 2);
+    assert.deepEqual(actual.values.slice(1), [expected.number, new Date("2026-09-25T16:00:00.000Z"), expected.sensor,
+      expected.bedengan, expected.moisture ?? "-", expected.temperature ?? "-", expected.humidity ?? "-", expected.status, expected.pump]);
+  });
+  const summary = workbook.getWorksheet("Ringkasan");
+  const average = (key) => {
+    const values = rows.map((row) => row[key]).filter((value) => value !== null);
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+  assert.equal(summaryValue(summary, "Jumlah data"), rows.length);
+  assert.equal(summaryValue(summary, "Rata-rata Soil Moisture (%)"), average("moisture"));
+  assert.equal(summaryValue(summary, "Rata-rata Temperature (°C)"), average("temperature"));
+  assert.deepEqual(rows, original);
+});
+
+test("CSV retains its existing headers, WITA text, precision and global pH metadata", () => {
+  let csv;
+  const rows = [{ ...sampleRows[0], moisture: 98.812345, temperature: 28.12345, humidity: null, pump: "On" }];
+  sendCsv({ type: (type) => {
+    assert.equal(type, "text/csv; charset=utf-8");
+    return { send: (value) => { csv = value; } };
+  } }, rows, globalSoilPh);
+  assert.equal(csv, '\uFEFF"Global Soil pH","6.40"\n"Pengukuran pH terakhir (WITA)","25/09/2026, 16.00.00 WITA"\n\n' +
+    '"No","Waktu (WITA)","Sensor","Bedengan","Soil Moisture (%)","Temperature (°C)","Humidity (%)","Status","Pump"\n' +
+    `"1","25/09/2026, 16.00.00 WITA","Sensor 1","Bedengan 1","98.81","28.1","-","${rows[0].status}","On"`);
 });

@@ -97,50 +97,135 @@ export function sendCsv(res, rows, globalSoilPh = {}) {
 export async function sendXlsx(res, rows, startDate, endDate, globalSoilPh = {}) {
   const workbook = new ExcelJS.Workbook();
   const summary = getSummary(rows);
+  const blue = "FF1DAADF";
+  const white = "FFFFFFFF";
+  const paleBlue = "FFF0F9FD";
+  const border = Object.fromEntries(["top", "left", "bottom", "right"].map((side) => [
+    side, { style: "thin", color: { argb: "FFDCE6ED" } },
+  ]));
+  const dateFormat = 'dd/mm/yyyy hh:mm:ss "WITA"';
+  const fill = (color) => ({ type: "pattern", pattern: "solid", fgColor: { argb: color } });
+
+  // reportRows already contains WITA wall-clock text. Excel dates have no timezone:
+  // encode those same components as UTC so Excel displays them without another offset.
+  const excelDate = (value) => {
+    const match = typeof value === "string" && value.match(/^(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2})[.:](\d{2})[.:](\d{2})\s+WITA$/);
+    if (!match) return value;
+    const [, day, month, year, hour, minute, second] = match.map(Number);
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  };
+
+  // Account for word wrapping and long identifiers when sizing text rows.
+  const textLines = (value, width) => {
+    if (typeof value !== "string") return 1;
+    const capacity = Math.max(1, Math.floor(width - 4));
+    return value.split(/\r?\n/).reduce((total, line) => {
+      let lines = 1;
+      let used = 0;
+      line.split(/\s+/).forEach((word) => {
+        if (used && used + 1 + word.length > capacity) { lines += 1; used = 0; }
+        const length = used ? used + 1 + word.length : word.length;
+        lines += Math.max(0, Math.ceil(length / capacity) - 1);
+        used = length ? ((length - 1) % capacity) + 1 : 0;
+      });
+      return total + lines;
+    }, 0);
+  };
+  const pageSetup = (orientation, printArea) => ({
+    paperSize: 9, orientation, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    margins: { left: 0.3, right: 0.3, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
+    horizontalCentered: true, printArea,
+  });
   const summarySheet = workbook.addWorksheet("Ringkasan");
-  summarySheet.columns = [{ width: 28 }, { width: 32 }];
+  summarySheet.columns = [{ width: 36 }, { width: 44 }];
   summarySheet.addRows([
     ["Laporan Data Monitoring Tanah", ""],
     ["Smart Soil Monitoring System", ""],
+    [],
+    ["Informasi", "Nilai"],
+    ["Nama sistem", "Smart Soil Monitoring System"],
     ["Periode data", startDate === endDate ? startDate : `${startDate} sampai ${endDate}`],
     ["Sensor", rows[0]?.sensor || "-"],
     ["Jumlah data", summary.count],
-    ["Rata-rata Soil Moisture (%)", summary.averageMoisture === null ? "-" : Number(summary.averageMoisture.toFixed(2))],
-    ["Global Soil pH", globalSoilPh.soilPh == null ? "-" : Number(globalSoilPh.soilPh.toFixed(2))],
-    ["Pengukuran pH terakhir", globalSoilPh.measuredAt ? formatWitaTimestamp(globalSoilPh.measuredAt) : "-"],
-    ["Rata-rata Temperature (°C)", summary.averageTemperature === null ? "-" : Number(summary.averageTemperature.toFixed(1))],
-    ["Dibuat pada", formatWitaTimestamp(new Date())],
+    ["Rata-rata Soil Moisture (%)", summary.averageMoisture ?? "-"],
+    ["Global Soil pH", globalSoilPh.soilPh ?? "-"],
+    ["Pengukuran pH terakhir", globalSoilPh.measuredAt ? excelDate(formatWitaTimestamp(globalSoilPh.measuredAt)) : "-"],
+    ["Rata-rata Temperature (°C)", summary.averageTemperature ?? "-"],
+    ["Dibuat pada", excelDate(formatWitaTimestamp(new Date()))],
   ]);
   summarySheet.mergeCells("A1:B1");
   summarySheet.mergeCells("A2:B2");
-  summarySheet.getRow(1).font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
-  summarySheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1686B3" } };
-  summarySheet.getRow(2).font = { italic: true, color: { argb: "FF475569" } };
-  summarySheet.getColumn(1).font = { bold: true, color: { argb: "FF334155" } };
+  summarySheet.eachRow((row, rowNumber) => {
+    if (rowNumber < 4) return;
+    row.height = Math.max(26, ...[1, 2].map((column) => textLines(row.getCell(column).value, summarySheet.getColumn(column).width) * 15 + 10));
+    row.eachCell({ includeEmpty: true }, (cell, column) => {
+      cell.font = { name: "Calibri", size: 11, bold: column === 1, color: { argb: "FF334155" } };
+      cell.fill = fill(rowNumber % 2 ? paleBlue : white);
+      cell.border = border;
+      cell.alignment = { vertical: "middle", horizontal: typeof cell.value === "number" ? "right" : "left", indent: 1, wrapText: true };
+    });
+  });
+  [1, 2, 4].forEach((rowNumber) => {
+    const row = summarySheet.getRow(rowNumber);
+    row.height = rowNumber === 1 ? 40 : 28;
+    row.font = { name: "Calibri", size: rowNumber === 1 ? 20 : 11, bold: rowNumber !== 2, color: { argb: white } };
+    row.fill = fill(blue);
+    row.alignment = { vertical: "middle", horizontal: rowNumber === 4 ? "left" : "center", indent: rowNumber === 4 ? 1 : 0 };
+  });
+  summarySheet.getRow(3).height = 12;
+  summarySheet.getCell("B8").numFmt = "#,##0";
+  ["B9", "B10"].forEach((address) => { summarySheet.getCell(address).numFmt = "0.00"; });
+  summarySheet.getCell("B12").numFmt = "0.0";
+  ["B11", "B13"].forEach((address) => { summarySheet.getCell(address).numFmt = dateFormat; });
   summarySheet.views = [{ showGridLines: false }];
+  summarySheet.pageSetup = pageSetup("portrait", "A1:B13");
 
   const sheet = workbook.addWorksheet("Data Monitoring");
+  const tableRows = rows.map((row) => [
+    row.number, excelDate(row.timestamp), row.sensor, row.bedengan,
+    row.moisture === null ? "-" : row.moisture,
+    row.temperature === null ? "-" : row.temperature,
+    row.humidity === null ? "-" : row.humidity,
+    row.status, row.pump,
+  ]);
   sheet.columns = reportColumns.map(({ header, key, width }) => ({ header, key, width }));
   sheet.addTable({
     name: "DataMonitoring",
-    ref: `A1:I${rows.length + 1}`,
+    ref: "A1",
     headerRow: true,
     totalsRow: false,
-    style: { theme: "TableStyleMedium2", showRowStripes: true },
-    columns: reportColumns.map(({ header }) => ({ name: header })),
-    rows: rows.map((row) => [
-      row.number, row.timestamp, row.sensor, row.bedengan,
-      row.moisture === null ? "-" : row.moisture,
-      row.temperature === null ? "-" : row.temperature,
-      row.humidity === null ? "-" : row.humidity,
-      row.status, row.pump,
-    ]),
+    // Direct cell styles provide the exact brand blue instead of a theme colour.
+    style: { theme: null, showRowStripes: false },
+    columns: reportColumns.map(({ header }) => ({ name: header, filterButton: true })),
+    rows: tableRows,
   });
-  sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  const maxWidths = [12, 32, 36, 26, 24, 24, 20, 26, 30];
+  reportColumns.forEach(({ width, align }, index) => {
+    const column = sheet.getColumn(index + 1);
+    let longest = column.header.length;
+    tableRows.forEach((row) => {
+      const value = row[index];
+      const text = value instanceof Date ? "00/00/0000 00:00:00 WITA" : String(value ?? "");
+      longest = Math.max(longest, ...text.split(/\r?\n/).map((line) => line.length));
+    });
+    column.width = Math.min(maxWidths[index], Math.max(width, longest + 4));
+    column.alignment = { horizontal: align || "left", vertical: "middle", wrapText: true };
+    column.font = { name: "Calibri", size: 11, color: { argb: "FF334155" } };
+  });
+  sheet.eachRow((row, rowNumber) => {
+    row.height = rowNumber === 1 ? 34 : Math.max(24, ...tableRows[rowNumber - 2].map((value, index) => textLines(value, sheet.getColumn(index + 1).width) * 15 + 8));
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = fill(rowNumber === 1 ? blue : rowNumber % 2 ? paleBlue : white);
+      cell.border = border;
+    });
+  });
+  sheet.getRow(1).font = { name: "Calibri", size: 11, bold: true, color: { argb: white } };
   sheet.getRow(1).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-  sheet.getColumn(1).alignment = { horizontal: "center" };
+  sheet.getColumn(1).numFmt = "0";
+  sheet.getColumn(2).numFmt = dateFormat;
   [5, 6, 7].forEach((column) => { sheet.getColumn(column).numFmt = column === 6 ? "0.0" : "0.00"; });
-  sheet.views = [{ state: "frozen", ySplit: 1, autoFilter: "A1:I1" }];
+  sheet.views = [{ state: "frozen", ySplit: 1, topLeftCell: "A2", showGridLines: false }];
+  sheet.pageSetup = { ...pageSetup("landscape", `A1:I${rows.length + 1}`), printTitlesRow: "1:1" };
   const buffer = await workbook.xlsx.writeBuffer();
   res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(Buffer.from(buffer));
 }
