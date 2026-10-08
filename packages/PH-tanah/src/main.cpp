@@ -3,41 +3,28 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
-// ================= PIN CONFIGURATION =================
-#define DMS_PIN     13    // Pin kontrol untuk modul DMS (kotak biru)
-#define LED_PIN     2     // Pin LED built-in ESP32 sebagai indikator
-#define ADC_PIN     34    // Pin input analog dari sensor pH
+// ================= INPUT OUTPUT =================
+#define DMSpin     13    // pin output untuk DMS
+#define indikator  2     // pin output led built-in untuk indikator pembacaan sensor
+#define adcPin     34    // pin input sensor pH tanah
 
-// ================= KALIBRASI ANDA ====================
-// Nilai ini didapat dari kalibrasi buffer 6.86 dan 4.01
-float m = -0.0129;  
-float c = 26.39;    
-// =====================================================
+// ================= VARIABEL =====================
+int ADC;
+float lastReading;
+float pH;
 
-// =====================================================
-// WIFI
-// =====================================================
-
+// ================= KONFIGURASI WIFI =============
 const char* ssid = "sensorsoil";
 const char* password = "unklab123";
 
-// =====================================================
-// SERVER
-// =====================================================
+// ================= KONFIGURASI SERVER ===========
+const char* serverUrl = "https://unggulmonitoring.com/api/sensors/ph";
 
-// Backend VPS Anda
-const char* serverUrl =
-    "https://unggulmonitoring.com/api/sensors/ph";
-
-// Endpoint health check backend
-const char* pingUrl =
-    "https://unggulmonitoring.com/health";
-
-// ================= CLIENT SECURE =====================
+// ================= CLIENT SECURE ================
 WiFiClientSecure secureWifiClient;
 WiFiClient wifiClient;
 
-// ================= HELPER HTTP CLIENT =================
+// Helper untuk koneksi HTTP / HTTPS
 bool beginHttpClient(HTTPClient& http, const String& targetUrl) {
   if (targetUrl.startsWith("https://")) {
     secureWifiClient.setInsecure(); // Mengabaikan verifikasi sertifikat SSL
@@ -51,7 +38,7 @@ bool beginHttpClient(HTTPClient& http, const String& targetUrl) {
   return true;
 }
 
-// ================= KONEKSI WIFI =======================
+// Inisialisasi koneksi WiFi
 void connectToWiFi() {
   const unsigned long wifiTimeout = 20000;
   const unsigned long startAttempt = millis();
@@ -80,39 +67,8 @@ void connectToWiFi() {
   }
 }
 
-// ================= TEST KONEKSI BACKEND ===============
-void testBackendConnection() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Tes backend gagal: WiFi belum terhubung");
-    return;
-  }
-
-  HTTPClient http;
-  String targetUrl = String(pingUrl);
-
-  beginHttpClient(http, targetUrl);
-  int httpResponseCode = http.GET();
-
-  Serial.println();
-  Serial.print("Tes backend: ");
-  Serial.println(targetUrl);
-  Serial.print("HTTP Response: ");
-  Serial.println(httpResponseCode);
-
-  if (httpResponseCode > 0) {
-    String responseBody = http.getString();
-    Serial.print("Respons: ");
-    Serial.println(responseBody);
-  } else {
-    Serial.print("Error: ");
-    Serial.println(http.errorToString(httpResponseCode));
-  }
-
-  http.end();
-}
-
-// ================= KIRIM DATA KE SERVER ===============
-void sendDataToServer(float adcValue, float pHValue) {
+// Kirim data pembacaan pH ke server
+void sendDataToServer(float phValue) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi terputus, mencoba menghubungkan kembali...");
     WiFi.disconnect();
@@ -131,10 +87,7 @@ void sendDataToServer(float adcValue, float pHValue) {
 
   HTTPClient http;
   String targetUrl = String(serverUrl);
-
-  // Satu probe pH menghasilkan satu pembacaan global. Jangan kirim sebagai
-  // sensor1..sensor6 atau menyertakan dummy moisture.
-  String jsonPayload = "{\"soil_ph\":" + String(pHValue, 2) + "}";
+  String jsonPayload = "{\"soil_ph\":" + String(phValue, 2) + "}";
 
   beginHttpClient(http, targetUrl);
   http.addHeader("Content-Type", "application/json");
@@ -163,75 +116,40 @@ void sendDataToServer(float adcValue, float pHValue) {
   http.end();
 }
 
-// ================= FUNGSI PEMBACAAN RATA-RATA =================
-float bacaADC_RataRata() {
-  long totalAnalog = 0;
-  int jumlahSampel = 30; 
-
-  for(int i = 0; i < jumlahSampel; i++){
-    totalAnalog += analogRead(ADC_PIN);
-    delay(10); // Jeda 10ms antar sampel
-  }
-  
-  return (float)totalAnalog / jumlahSampel;
-}
-
 void setup() {
-  Serial.begin(9600); // Sesuaikan dengan platformio.ini
-  
-  // Gunakan resolusi 12-bit (0-4095) agar sama dengan kode kalibrasi
-  analogReadResolution(12); 
-  
-  pinMode(DMS_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
-  
-  // Matikan sensor dan LED di awal
-  digitalWrite(DMS_PIN, HIGH); // HIGH = DMS Off
-  digitalWrite(LED_PIN, LOW);  // LOW = LED Off
-  
-  Serial.println("==================================================");
-  Serial.println("       SISTEM MONITORING pH TANAH AKTIF           ");
-  Serial.println("==================================================");
-  delay(1000);
+  Serial.begin(115200);          // setting baudrate komunikasi serial
+  analogReadResolution(10);      // setting resolusi pembacaan ADC menjadi 10 bit
+  pinMode(DMSpin, OUTPUT);
+  pinMode(indikator, OUTPUT);
+  digitalWrite(DMSpin, HIGH);     // non-aktifkan DMS
 
-  // Inisialisasi WiFi & Test Backend
+  // Hubungkan WiFi saat awal booting
   connectToWiFi();
-  testBackendConnection();
 }
 
 void loop() {
-  // 1. Nyalakan Sensor (DMS) dan Indikator LED
-  digitalWrite(DMS_PIN, LOW);  // LOW = DMS On
-  digitalWrite(LED_PIN, HIGH); // HIGH = LED On
-  
-  // 2. Tunggu sensor stabil (Warm-up)
-  delay(5000); 
-  
-  // 3. Baca nilai ADC dengan metode rata-rata
-  float adcValue = bacaADC_RataRata();
-  
-  // 4. Hitung nilai pH menggunakan rumus kalibrasi Anda
-  float pHValue = (m * adcValue) + c;
-  
-  // 5. Batasi nilai pH agar tidak error (Out of range protection)
-  if (pHValue > 14.0) pHValue = 14.0;
-  if (pHValue < 0.0)  pHValue = 0.0;
-  
-  // 6. Tampilkan hasil ke Serial Monitor
-  Serial.print("ADC: ");
-  Serial.print(adcValue, 0); // Tampilkan ADC tanpa desimal
-  Serial.print(" | pH Tanah: ");
-  Serial.println(pHValue, 2); // Tampilkan pH dengan 2 desimal
-  
-  // 7. Matikan Sensor (DMS) dan Indikator LED
-  // WAJIB dimatikan agar probe logam tidak berkarat saat ditanam!
-  digitalWrite(DMS_PIN, HIGH); // HIGH = DMS Off
-  digitalWrite(LED_PIN, LOW);  // LOW = LED Off
-  
-  // 8. Kirim data hasil pengukuran ke backend server web
-  sendDataToServer(adcValue, pHValue);
-  
-  // 9. Jeda sebelum pengukuran berikutnya
-  // Jeda 55 detik + 5 detik warm-up sensor = siklus pengiriman tepat 1 menit (60 detik).
-  delay(55000); 
+  digitalWrite(DMSpin, LOW);      // aktifkan DMS
+  digitalWrite(indikator, HIGH); // led indikator built-in ESP32 menyala
+  delay(10 * 1000);              // wait DMS capture data
+  ADC = analogRead(adcPin); 
+
+  pH = (-0.0233 * ADC) + 12.698;  // rumus regresi linier konversi adc ke pH
+  if (pH != lastReading) { 
+    lastReading = pH; 
+  }
+
+  if(lastReading > 14.0){lastReading = 0.0;}  // nol kan nilai pH saat out of range
+
+  Serial.print("ADC=");
+  Serial.print(ADC);             // menampilkan nilai ADC di serial monitor pada baudrate 115200
+  Serial.print(" pH=");
+  Serial.println(lastReading, 1); // menampilkan nilai pH di serial monitor pada baudrate 115200
+
+  digitalWrite(DMSpin, HIGH);
+  digitalWrite(indikator, LOW);
+
+  // Kirim data pH ke backend server
+  sendDataToServer(lastReading);
+
+  delay(50 * 1000);              // tunggu 50 detik (total siklus = 10s baca + 50s jeda = 60 detik / 1 menit)
 }
