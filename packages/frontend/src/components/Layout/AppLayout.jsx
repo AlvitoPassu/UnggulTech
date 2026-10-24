@@ -16,10 +16,14 @@ const AppLayout = () => {
   const [isLogoutConfirmationOpen, setIsLogoutConfirmationOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-  const { isAuthenticated, openLoginModal, logout } = useAuth();
+  const { isAuthenticated, openLoginModal, logout, sessionNotice, authStatus, revalidateSession } = useAuth();
   const AuthIcon = isAuthenticated ? FiLogOut : FiLogIn;
 
   const handleAuthenticationAction = () => {
+    if (authStatus === "unavailable") {
+      void revalidateSession();
+      return;
+    }
     if (isAuthenticated) {
       setLogoutError("");
       setIsLogoutConfirmationOpen(true);
@@ -42,7 +46,7 @@ const AppLayout = () => {
     try {
       const didLogout = await logout();
       if (!didLogout) {
-        setLogoutError("Logout gagal. Silakan coba kembali.");
+        setLogoutError("Logout belum dikonfirmasi backend. Periksa koneksi dan coba kembali.");
         return;
       }
       setIsLogoutConfirmationOpen(false);
@@ -93,7 +97,7 @@ const AppLayout = () => {
             className="relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-inset"
           >
             <AuthIcon className="text-lg" aria-hidden="true" />
-            <span>{isAuthenticated ? "Logout" : "Login"}</span>
+            <span>{isAuthenticated ? "Logout" : authStatus === "unavailable" ? "Periksa Sesi" : "Login"}</span>
           </button>
         </div>
 
@@ -202,13 +206,18 @@ const AppLayout = () => {
       >
         <AuthIcon className="text-xl" aria-hidden="true" />
         <span className="text-center text-[10px] font-semibold leading-tight">
-          {isAuthenticated ? "Logout" : "Login"}
+          {isAuthenticated ? "Logout" : authStatus === "unavailable" ? "Periksa Sesi" : "Login"}
         </span>
       </button>
     </nav>
 
     {/* Main content */}
     <div className={`pb-16 transition-[padding] duration-200 lg:pb-0 ${isSidebarOpen ? "lg:pl-60" : "lg:pl-0"}`}>
+      {sessionNotice && <div role="status" className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        {sessionNotice}
+        {authStatus === "unavailable" && <button type="button" onClick={revalidateSession}
+          className="ml-3 font-semibold underline">Periksa kembali sesi</button>}
+      </div>}
       <Outlet />
     </div>
     <ChatbotAssistant />

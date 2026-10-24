@@ -1,202 +1,124 @@
+import { createHash } from "node:crypto";
 import { supabase } from "../config/supabase.js";
 import { logAudit } from "../services/auditService.js";
 
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 menit
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SECRET = /^[0-9a-f]{64}$/;
+const ERRORS = {
+  UNAUTHORIZED: [401, "Token otentikasi tidak ditemukan atau tidak valid."],
+  TOKEN_EXPIRED: [401, "Sesi otentikasi tidak valid atau telah kedaluwarsa."],
+  MISSING_SESSION_ID: [401, "Identitas sesi aplikasi wajib disertakan."],
+  INVALID_SESSION: [401, "Identitas sesi aplikasi tidak valid."],
+  SESSION_NOT_FOUND: [401, "Sesi Anda telah berakhir. Silakan login kembali."],
+  SESSION_MISMATCH: [401, "Sesi ini bukan sesi operator aktif. Silakan login kembali."],
+  SESSION_TIMEOUT: [401, "Sesi telah berakhir karena tidak ada aktivitas selama 10 menit."],
+  GLOBAL_SESSION_BUSY: [409, "Saat ini terdapat pengguna lain yang sedang login ke sistem Unggul Monitoring. Silakan mencoba kembali setelah pengguna tersebut logout atau sesi berakhir."],
+  SESSION_STILL_ACTIVE: [409, "Sesi masih aktif; logout otomatis belum dilakukan."],
+  INVALID_ACTIVITY: [400, "Identitas atau waktu aktivitas tidak valid."],
+  ACTIVITY_STALE: [409, "Aktivitas terlalu lama. Lakukan interaksi baru sebelum sesi berakhir."],
+  AUTH_UNAVAILABLE: [503, "Layanan autentikasi belum tersedia. Silakan mencoba kembali."],
+  SESSION_DATABASE_UNAVAILABLE: [503, "Pengelolaan sesi belum tersedia. Silakan mencoba kembali."],
+};
 
-// In-memory fallback untuk single-device session tracking jika tabel database belum dibuat
-const memorySessionRegistry = new Map();
+export class SessionError extends Error {
+  constructor(code) {
+    super(ERRORS[code]?.[1] || ERRORS.SESSION_DATABASE_UNAVAILABLE[1]);
+    this.code = code;
+    this.status = ERRORS[code]?.[0] || 503;
+  }
+}
+const providerError = (error) => new SessionError(
+  ["invalid_jwt", "bad_jwt", "session_not_found"].includes(error?.code) ? "TOKEN_EXPIRED"
+    : !error?.status || error.status >= 500 || error.status === 429 ? "AUTH_UNAVAILABLE" : "TOKEN_EXPIRED"
+);
 
-/**
- * Mendaftarkan atau memperbarui sesi aktif untuk seorang operator (Single Device Session).
- * Membatalkan sesi sebelumnya jika ada.
- */
-export const registerActiveSession = async (userId, sessionId, { userAgent = null, ipAddress = null } = {}) => {
-  const now = new Date();
-  const sessionData = {
-    user_id: userId,
-    session_id: sessionId,
-    last_active_at: now.toISOString(),
-    user_agent: userAgent,
-    ip_address: ipAddress,
-    updated_at: now.toISOString(),
+// Tests inject local clients. Production always uses the trusted Supabase client.
+export const createAuthMiddleware = ({ client = supabase, audit = logAudit } = {}) => {
+  const identify = async (req) => {
+    const match = /^Bearer ([^\s]+)$/.exec(req.headers.authorization || "");
+    if (!match) throw new SessionError("UNAUTHORIZED");
+    const token = match[1];
+    let userResult;
+    let claimsResult;
+    try {
+      userResult = await client.auth.getUser(token);
+      if (userResult.error) throw providerError(userResult.error);
+      claimsResult = await client.auth.getClaims(token);
+      if (claimsResult.error) throw providerError(claimsResult.error);
+    } catch (error) {
+      if (error instanceof SessionError) throw error;
+      throw new SessionError("AUTH_UNAVAILABLE");
+    }
+    const user = userResult.data?.user;
+    const claims = claimsResult.data?.claims;
+    // getClaims verifies signatures or delegates to Auth for symmetric keys.
+    // Never establish identity by decoding an unverified JWT.
+    if (!user || !UUID.test(user.id) || claims?.sub !== user.id || !UUID.test(claims?.session_id || "")
+      || !Number.isFinite(claims?.exp) || claims.exp * 1000 <= Date.now()) {
+      throw new SessionError("TOKEN_EXPIRED");
+    }
+    const sessionId = req.headers["x-session-id"];
+    if (!sessionId) throw new SessionError("MISSING_SESSION_ID");
+    if (typeof sessionId !== "string" || !SECRET.test(sessionId)) throw new SessionError("INVALID_SESSION");
+    if (req.body?.sessionId !== undefined && req.body.sessionId !== sessionId) throw new SessionError("INVALID_SESSION");
+    return { user, authSessionId: claims.session_id,
+      sessionHash: createHash("sha256").update(sessionId).digest("hex") };
   };
 
-  // Simpan di memory registry
-  memorySessionRegistry.set(userId, {
-    sessionId,
-    lastActiveAt: now.getTime(),
-    userAgent,
-    ipAddress,
-  });
-
-  // Simpan ke Supabase database jika tabel tersedia
-  try {
-    const { error } = await supabase.from("user_sessions").upsert(sessionData, { onConflict: "user_id" });
-    if (error) {
-      console.warn("[SESSION] Database upsert warning (using memory registry):", error.message);
+  const operate = async (identity, operation = "validate", activity = {}) => {
+    if (operation === "extend" && (!Number.isSafeInteger(activity.activityRevision) || activity.activityRevision < 1
+      || typeof activity.activityAt !== "string" || !Number.isFinite(Date.parse(activity.activityAt)))) {
+      throw new SessionError("INVALID_ACTIVITY");
     }
-  } catch (err) {
-    console.warn("[SESSION] Error updating user_sessions:", err.message || err);
-  }
+    let result;
+    try {
+      result = await client.rpc(operation === "acquire" ? "operator_session_acquire"
+        : operation === "extend" ? "operator_session_extend" : "operator_session_check", {
+        p_user_id: identity.user.id,
+        p_auth_session_id: identity.authSessionId,
+        p_app_session_hash: identity.sessionHash,
+        ...(operation === "extend" ? { p_activity_revision: activity.activityRevision, p_activity_at: activity.activityAt }
+          : operation === "acquire" ? {} : { p_operation: operation }),
+      });
+    } catch {
+      throw new SessionError("SESSION_DATABASE_UNAVAILABLE");
+    }
+    if (result.error || !result.data?.code) throw new SessionError("SESSION_DATABASE_UNAVAILABLE");
+    if (result.data.code !== "OK") {
+      if (!ERRORS[result.data.code]) throw new SessionError("SESSION_DATABASE_UNAVAILABLE");
+      const error = new SessionError(result.data.code);
+      if (error.code === "SESSION_STILL_ACTIVE") error.lease = result.data;
+      throw error;
+    }
+    return result.data;
+  };
 
-  return sessionData;
+  const reject = async (req, res, error) => {
+    const safeError = error instanceof SessionError ? error : new SessionError("SESSION_DATABASE_UNAVAILABLE");
+    // Session status polling is observational and does not generate audit spam.
+    if (req.path !== "/session-status") {
+      await audit({ userId: req.operatorIdentity?.user.id || null,
+        action: safeError.status === 503 ? "SESSION_BACKEND_ERROR"
+          : safeError.code === "GLOBAL_SESSION_BUSY" ? "LOGIN_REJECTED_BUSY" : "SESSION_INVALID",
+        resource: "auth", metadata: { code: safeError.code }, req });
+    }
+    return res.status(safeError.status).json({ code: safeError.code, message: safeError.message,
+      ...(safeError.lease ? { lease: safeError.lease } : {}) });
+  };
+
+  const requireAuth = async (req, res, next) => {
+    try {
+      req.operatorIdentity = await identify(req);
+      req.operatorLease = await operate(req.operatorIdentity);
+      req.user = req.operatorIdentity.user;
+      // Neither public polling nor protected validation counts as user activity.
+      return next();
+    } catch (error) {
+      return reject(req, res, error);
+    }
+  };
+  return { identify, operate, reject, requireAuth };
 };
 
-/**
- * Menghapus/mencabut sesi aktif operator.
- */
-export const revokeActiveSession = async (userId, sessionId = null) => {
-  const existing = memorySessionRegistry.get(userId);
-  if (!sessionId || (existing && existing.sessionId === sessionId)) {
-    memorySessionRegistry.delete(userId);
-  }
-
-  try {
-    let query = supabase.from("user_sessions").delete().eq("user_id", userId);
-    if (sessionId) {
-      query = query.eq("session_id", sessionId);
-    }
-    await query;
-  } catch (err) {
-    console.warn("[SESSION] Error deleting user_sessions:", err.message || err);
-  }
-};
-
-/**
- * Mengambil informasi sesi aktif operator.
- */
-export const getActiveSession = async (userId) => {
-  // Coba ambil dari database
-  try {
-    const { data, error } = await supabase
-      .from("user_sessions")
-      .select("session_id, last_active_at, user_agent, ip_address")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (!error && data) {
-      return {
-        sessionId: data.session_id,
-        lastActiveAt: new Date(data.last_active_at).getTime(),
-        userAgent: data.user_agent,
-        ipAddress: data.ip_address,
-      };
-    }
-  } catch {
-    // ignore
-  }
-
-  // Fallback ke memory registry
-  return memorySessionRegistry.get(userId) || null;
-};
-
-/**
- * Memperbarui timestamp aktivitas terakhir sesi operator.
- */
-export const touchActiveSession = async (userId, sessionId) => {
-  const now = new Date();
-  const existing = memorySessionRegistry.get(userId);
-  if (existing && existing.sessionId === sessionId) {
-    existing.lastActiveAt = now.getTime();
-  }
-
-  try {
-    await supabase
-      .from("user_sessions")
-      .update({ last_active_at: now.toISOString(), updated_at: now.toISOString() })
-      .eq("user_id", userId)
-      .eq("session_id", sessionId);
-  } catch {
-    // ignore
-  }
-};
-
-/**
- * Middleware untuk memvalidasi otentikasi Supabase, Single Active Session, dan timeout 10 menit.
- */
-export const requireAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        message: "Akses ditolak. Token otentikasi tidak ditemukan.",
-        code: "UNAUTHORIZED",
-      });
-    }
-
-    const token = authHeader.split(" ")[1]?.trim();
-    if (!token) {
-      return res.status(401).json({
-        message: "Akses ditolak. Format token tidak valid.",
-        code: "UNAUTHORIZED",
-      });
-    }
-
-    // 1. Validasi Supabase JWT Token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return res.status(401).json({
-        message: "Sesi otentikasi tidak valid atau telah kedaluwarsa.",
-        code: "TOKEN_EXPIRED",
-      });
-    }
-
-    // 2. Validasi Sesi Perangkat (Single Active Session)
-    const clientSessionId = req.headers["x-session-id"]?.toString()?.trim();
-    if (!clientSessionId) {
-      return res.status(401).json({
-        message: "Sesi perangkat tidak valid. Silakan login kembali.",
-        code: "MISSING_SESSION_ID",
-      });
-    }
-
-    const activeSession = await getActiveSession(user.id);
-    if (!activeSession) {
-      // Belum ada sesi terdaftar di server untuk user ini
-      return res.status(401).json({
-        message: "Sesi Anda telah berakhir. Silakan login kembali.",
-        code: "SESSION_NOT_FOUND",
-      });
-    }
-
-    // Cek apakah ada perangkat lain yang sudah login (Single Active Session enforcement)
-    if (activeSession.sessionId !== clientSessionId) {
-      return res.status(401).json({
-        message: "Sesi telah berakhir karena akun Anda telah masuk dari perangkat lain.",
-        code: "SESSION_SUPERSEDED",
-      });
-    }
-
-    // 3. Validasi Inaktivitas 10 Menit (Backend Timeout Check)
-    const now = Date.now();
-    const elapsed = now - activeSession.lastActiveAt;
-    if (elapsed > INACTIVITY_TIMEOUT_MS) {
-      await revokeActiveSession(user.id, clientSessionId);
-      await logAudit({
-        userId: user.id,
-        action: "LOGOUT_TIMEOUT",
-        metadata: { reason: "10-minute inactivity timeout detected on protected request" },
-        req,
-      });
-
-      return res.status(401).json({
-        message: "Sesi telah berakhir karena tidak ada aktivitas selama 10 menit.",
-        code: "SESSION_TIMEOUT",
-      });
-    }
-
-    // Perbarui waktu aktivitas terakhir
-    await touchActiveSession(user.id, clientSessionId);
-
-    // Lampirkan informasi pengguna dan sesi ke request Express
-    req.user = user;
-    req.sessionId = clientSessionId;
-
-    return next();
-  } catch (error) {
-    console.error("[AUTH MIDDLEWARE] Error:", error.message || error);
-    return res.status(500).json({
-      message: "Terjadi kesalahan pada verifikasi otentikasi.",
-    });
-  }
-};
+export const operatorAuth = createAuthMiddleware();
+export const requireAuth = operatorAuth.requireAuth;

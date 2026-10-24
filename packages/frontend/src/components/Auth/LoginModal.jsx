@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FiEye, FiEyeOff, FiLock, FiAlertCircle } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
+import { loginErrorMessage } from "../../lib/operatorSessionClient";
 
 const LoginModal = () => {
   const { isLoginModalOpen, closeLoginModal, login } = useAuth();
@@ -29,8 +30,8 @@ const LoginModal = () => {
       setIdentifier("");
       setPassword("");
       setErrorMessage("");
-    } catch {
-      setErrorMessage("Username atau password tidak valid.");
+    } catch (error) {
+      setErrorMessage(loginErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +74,7 @@ const LoginModal = () => {
         {errorMessage && (
           <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
             <FiAlertCircle className="mt-0.5 shrink-0 text-sm" aria-hidden="true" />
-            <span>{errorMessage}</span>
+            <div><p className="font-semibold">Login Tidak Dapat Dilakukan</p><p>{errorMessage}</p></div>
           </div>
         )}
 

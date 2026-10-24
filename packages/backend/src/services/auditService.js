@@ -8,6 +8,12 @@ const SENSITIVE_KEYS = new Set([
   "secret",
   "service_role_key",
   "authorization",
+  "session_id",
+  "sessionid",
+  "session_secret",
+  "app_session_hash",
+  "sessionhash",
+  "x-session-id",
 ]);
 
 /**

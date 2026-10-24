@@ -186,8 +186,17 @@ to anon, authenticated
 using (true);
 
 drop policy if exists "rainfall_readings_insert_all" on public.rainfall_readings;
-create policy "rainfall_readings_insert_all"
-on public.rainfall_readings
-for insert
-to anon, authenticated
-with check (true);
+-- Operator writes go through the backend service role and global session RPCs.
+-- Keep public SELECT policies above unchanged.
+drop policy if exists rainfall_operator_no_direct_insert on public.rainfall_readings;
+create policy rainfall_operator_no_direct_insert on public.rainfall_readings
+  as restrictive for insert to anon, authenticated with check (false);
+drop policy if exists rainfall_operator_no_direct_update on public.rainfall_readings;
+create policy rainfall_operator_no_direct_update on public.rainfall_readings
+  as restrictive for update to anon, authenticated using (false) with check (false);
+drop policy if exists rainfall_operator_no_direct_delete on public.rainfall_readings;
+create policy rainfall_operator_no_direct_delete on public.rainfall_readings
+  as restrictive for delete to anon, authenticated using (false);
+revoke insert, update, delete, truncate, references, trigger on public.rainfall_readings
+  from public, anon, authenticated;
+grant select, insert, update, delete on public.rainfall_readings to service_role;

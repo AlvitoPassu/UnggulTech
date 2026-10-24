@@ -1,5 +1,9 @@
 -- =============================================================================
 -- UNGGULTECH AUTHENTICATION & AUDIT LOG MIGRATION
+-- Legacy bootstrap only. For new installs apply 20261008_01_global_operator_session.sql
+-- and 20261008_02_operator_write_permissions.sql after this file.
+-- New application code never uses user_sessions. This bootstrap is not a
+-- replacement for the reviewed global-session migration on an existing DB.
 -- =============================================================================
 -- Deskripsi:
 -- 1. Menambahkan tabel `public.user_sessions` untuk kontrol Single Active Session

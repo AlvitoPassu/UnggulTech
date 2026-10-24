@@ -1,4 +1,3 @@
-import React from "react";
 import { FiLogOut, FiUser } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 
