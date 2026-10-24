@@ -39,8 +39,8 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ message: "Terjadi kesalahan pada server backend." });
 });
 
-app.listen(config.port, () => {
-  console.log(`Backend listening on http://localhost:${config.port}`);
+app.listen(config.port, "127.0.0.1", () => {
+  console.log(`Backend listening on http://127.0.0.1:${config.port}`);
 });
 
 export { app };
