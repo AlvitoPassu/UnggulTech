@@ -22,7 +22,7 @@ const HeaderAuthStatus = () => {
       <button
         type="button"
         onClick={logout}
-        className="flex items-center gap-1.5 rounded-md border border-white/35 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:border-white/60 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40"
+        className="flex items-center gap-1.5 rounded-md border border-red-500/40 bg-[#B91C1C] px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#991B1B] hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-300/60 active:scale-95"
         title="Keluar dari sesi operator"
         aria-label="Logout"
       >
