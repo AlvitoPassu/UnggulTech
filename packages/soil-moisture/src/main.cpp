@@ -123,7 +123,7 @@ struct SensorConfig {
 // =====================================================
 // Sensor capacitive normal memiliki ADC ~1500 (basah kuyup) hingga ~3100 (kering udara).
 // Jika kabel dicabut atau sensor rusak/floating, ADC akan jatuh < 300 atau > 3500.
-constexpr int adcMinConnected = 380;
+constexpr int adcMinConnected = 0;
 constexpr int adcMaxConnected = 3500;
 
 // =====================================================
@@ -160,7 +160,7 @@ constexpr SensorConfig sensor1Config = {
 constexpr SensorConfig sensor3Config = {
     sensor3Channel,
     1843,
-    1035,
+    677,
     "Sensor 3",
     true
 };
@@ -171,7 +171,7 @@ constexpr SensorConfig sensor3Config = {
 constexpr SensorConfig sensor4Config = {
     sensor4Channel,
     1672,
-    380,
+    867,
     "Sensor 4",
     true
 };
@@ -189,7 +189,7 @@ constexpr SensorConfig sensor5Config = {
 constexpr SensorConfig sensor6Config = {
     sensor6Channel,
     2310,
-    1448,
+    1600,
     "Sensor 6",
     true
 };

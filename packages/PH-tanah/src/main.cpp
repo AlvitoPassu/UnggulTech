@@ -3,15 +3,16 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
-// ================= INPUT OUTPUT =================
-#define DMSpin     13    // pin output untuk DMS
-#define indikator  2     // pin output led built-in untuk indikator pembacaan sensor
-#define adcPin     34    // pin input sensor pH tanah
+/* Syarat Pengoperasian Berdasarkan Pabrikan *******
+ * 1. Tanah wajib lembab dan padat.
+ * 2. Pembacaan di air bening TANPA TANAH tidak valid.
+ * 3. Minimal ujung sensor masuk sedalam 8cm.
+***************************************************/
 
-// ================= VARIABEL =====================
-int ADC;
-float lastReading;
-float pH;
+// ================= INPUT OUTPUT =================
+#define DMSpin     13    // Pin output untuk menyalakan/mematikan DMS
+#define indikator  2     // Pin LED built-in ESP32
+#define adcPin     34    // Pin input analog dari Sensor
 
 // ================= KONFIGURASI WIFI =============
 const char* ssid = "sensorsoil";
@@ -117,39 +118,59 @@ void sendDataToServer(float phValue) {
 }
 
 void setup() {
-  Serial.begin(115200);          // setting baudrate komunikasi serial
-  analogReadResolution(10);      // setting resolusi pembacaan ADC menjadi 10 bit
+  Serial.begin(115200);          // Baudrate 115200 (sesuai monitor_speed di platformio.ini)
+  analogReadResolution(10);      // WAJIB: ESP32 dipaksa ke resolusi 10-bit (0-1023)
+  
   pinMode(DMSpin, OUTPUT);
   pinMode(indikator, OUTPUT);
-  digitalWrite(DMSpin, HIGH);     // non-aktifkan DMS
+  digitalWrite(DMSpin, HIGH);    // Matikan DMS saat pertama kali menyala (Standby)
+  
+  Serial.println("Sistem Sensor pH Tanah (DMS) Siap!");
 
   // Hubungkan WiFi saat awal booting
   connectToWiFi();
 }
 
 void loop() {
-  digitalWrite(DMSpin, LOW);      // aktifkan DMS
-  digitalWrite(indikator, HIGH); // led indikator built-in ESP32 menyala
-  delay(10 * 1000);              // wait DMS capture data
-  ADC = analogRead(adcPin); 
-
-  pH = (-0.0233 * ADC) + 12.698;  // rumus regresi linier konversi adc ke pH
-  if (pH != lastReading) { 
-    lastReading = pH; 
+  Serial.println("Mengaktifkan sensor... Menunggu 10 detik agar reaksi tanah stabil...");
+  
+  digitalWrite(DMSpin, LOW);     // Aktifkan DMS
+  digitalWrite(indikator, HIGH); // Nyalakan LED biru ESP32 tanda sedang membaca
+  
+  delay(10000);                  // Jeda 10 detik wajib dari pabrik agar sinyal matang
+  
+  // --- MULAI PROSES SMOOTHING (MENGAMBIL 30 DATA) ---
+  long totalAnalog = 0;
+  int jumlahSampel = 30;
+  
+  for(int i = 0; i < jumlahSampel; i++) {
+    totalAnalog += analogRead(adcPin);
+    delay(10);
   }
+  
+  float ADC_rata_rata = (float)totalAnalog / jumlahSampel;
+  // --------------------------------------------------
+  
+  // Rumus kalibrasi bawaan pabrik penjual
+  float pH = (-0.0233 * ADC_rata_rata) + 12.698;  
+  
+  // Filter jika nilai error / di luar nalar
+  if(pH > 14.0) { pH = 0.0; }
+  if(pH < 0.0)  { pH = 0.0; }
+  
+  // Tampilkan hasil ke terminal
+  Serial.print("Nilai ADC (Rata-rata) = ");
+  Serial.print(ADC_rata_rata, 1);             
+  Serial.print(" | pH Tanah = ");
+  Serial.println(pH, 1); 
 
-  if(lastReading > 14.0){lastReading = 0.0;}  // nol kan nilai pH saat out of range
-
-  Serial.print("ADC=");
-  Serial.print(ADC);             // menampilkan nilai ADC di serial monitor pada baudrate 115200
-  Serial.print(" pH=");
-  Serial.println(lastReading, 1); // menampilkan nilai pH di serial monitor pada baudrate 115200
-
-  digitalWrite(DMSpin, HIGH);
-  digitalWrite(indikator, LOW);
-
+  digitalWrite(DMSpin, HIGH);    // Matikan modul DMS agar sensor awet
+  digitalWrite(indikator, LOW);  // Matikan LED
+  
   // Kirim data pH ke backend server
-  sendDataToServer(lastReading);
+  sendDataToServer(pH);
 
-  delay(50 * 1000);              // tunggu 50 detik (total siklus = 10s baca + 50s jeda = 60 detik / 1 menit)
+  Serial.println("Sensor istirahat 50 detik...");
+  Serial.println("------------------------------------");
+  delay(50000);                  // Jeda istirahat agar total siklus tepat 1 menit (60 detik)
 }

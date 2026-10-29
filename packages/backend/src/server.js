@@ -9,6 +9,7 @@ import chatbotRoutes from "./routes/chatbotRoutes.js";
 import rainfallRoutes from "./routes/rainfallRoutes.js";
 import recommendationRoutes from "./routes/recommendationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import { startTelegramBotPolling } from "./services/telegramService.js";
 
 if (!process.env.GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY is not configured.");
@@ -42,6 +43,7 @@ app.use((error, _req, res, _next) => {
 
 app.listen(config.port, "127.0.0.1", () => {
   console.log(`Backend listening on http://127.0.0.1:${config.port}`);
+  startTelegramBotPolling();
 });
 
 export { app };
