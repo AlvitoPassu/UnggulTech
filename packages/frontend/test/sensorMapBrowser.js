@@ -64,6 +64,13 @@ frame.addEventListener("load", () => {
 frame.src = "/sensor";
 await waitFor(() => doc()?.querySelector(".bed-button") && !text().includes("Memuat daftar sensor"));
 
+await test("awal halaman menampilkan peta dan petunjuk tanpa pembacaan, grafik, atau request sensor otomatis", async () => {
+  assert(doc().querySelector(".bed-viewport svg"), "Peta bedengan hilang");
+  assert(text().includes("Pilih sensor pada peta bedengan untuk melihat grafik monitoring dan pembacaan terbaru."), "Petunjuk hilang");
+  assert(!doc().querySelector('[aria-label="Pembacaan Terbaru"], [aria-label="Grafik Monitoring"], .recharts-wrapper, table'), "Monitoring muncul sebelum sensor dipilih");
+  const snapshot = await state();
+  assert(!Object.keys(snapshot.calls).some((path) => /\/\d+\/(data|recent-logs)$/.test(path)), "Sensor dipilih otomatis");
+});
 await test("60 bedengan berurutan; SVG berisi 1.000 titik", () => {
   const beds = [...doc().querySelectorAll(".bed-button")];
   assert(beds.length === 60 && beds.every((bed, index) => bed.textContent === `B${index + 1}`), "Urutan bedengan salah");
@@ -91,6 +98,7 @@ await test("pemilihan marker menampilkan identitas dan data sebenarnya dari fixt
   assert(doc().querySelector('.sensor-marker[aria-label^="Sensor 701,"]').getAttribute("aria-pressed") === "true", "Marker tidak disorot");
   assert(!text().includes("Suhu udara (DHT11"), "Suhu kosong ditampilkan");
   assert(text().includes("pH Tanah — Pengukuran Global"), "pH tidak diberi label global");
+  assert(doc().querySelector('[aria-label="Pembacaan Terbaru"] table') && doc().querySelector('[aria-label="Grafik Monitoring"] .recharts-wrapper'), "Pembacaan/grafik masih tersembunyi dalam panel lipat");
   await click('.bed-button[aria-label^="Bedengan 2,"]');
   await click('.sensor-marker[aria-label^="Sensor 702,"]');
   await waitFor(() => doc().querySelector('section[aria-label="Informasi sensor dan pengukuran global"] h2')?.textContent === "Sensor 702" && text().includes("56%"));
@@ -100,6 +108,7 @@ await test("pergantian bedengan reset sensor dan menolak respons lama", async ()
   await state({ delay: 1400 });
   await click('.bed-button[aria-label^="Bedengan 3,"]');
   assert(!text().includes("56%"), "Detail sebelumnya tertinggal");
+  assert(!doc().querySelector('[aria-label="Pembacaan Terbaru"], [aria-label="Grafik Monitoring"]'), "Monitoring tidak direset saat pindah bedengan");
   await click('.bed-button[aria-label^="Bedengan 1,"]');
   await click('.sensor-marker[aria-label^="Sensor 701,"]');
   await click('.bed-button[aria-label^="Bedengan 3,"]');
@@ -125,8 +134,15 @@ await test("desktop, tablet, smartphone tanpa overflow halaman; target sentuh �
     assert(doc().documentElement.scrollWidth <= width, `Overflow pada ${width}px: ${doc().documentElement.scrollWidth}`);
     assert(doc().querySelector(".bed-button").getBoundingClientRect().height >= 44, "Target bedengan terlalu kecil");
     const panels = [...doc().querySelectorAll('section[aria-label]')].filter((element) => /Detail bedengan|Informasi sensor dan/.test(element.getAttribute("aria-label")));
-    const [left, right] = panels.map((element) => element.getBoundingClientRect());
-    assert(width === 1440 ? Math.abs(left.top - right.top) < 2 : right.top > left.top, `Susunan panel salah pada ${width}px`);
+    const [map, monitoring] = panels.map((element) => element.getBoundingClientRect());
+    assert(monitoring.top >= map.bottom && Math.abs(map.width - monitoring.width) < 2, `Monitoring tidak berada di bawah peta dengan lebar penuh pada ${width}px`);
+    const latest = doc().querySelector('[aria-label="Pembacaan Terbaru"]').getBoundingClientRect();
+    const charts = doc().querySelector('[aria-label="Grafik Monitoring"]').getBoundingClientRect();
+    assert(latest.top > monitoring.top && charts.top >= latest.bottom, `Urutan informasi, pembacaan, grafik salah pada ${width}px`);
+    for (const chart of doc().querySelectorAll(".recharts-wrapper")) assert(chart.getBoundingClientRect().width > 0, "Grafik tidak mendapatkan lebar");
+    doc().querySelector('[aria-label="Pembacaan Terbaru"]').scrollIntoView();
+    await delay(50);
+    assert(doc().querySelector('[aria-label="Pembacaan Terbaru"] h3').getBoundingClientRect().top >= doc().querySelector(".sensor-page header").getBoundingClientRect().bottom, "Sticky header menutupi judul pembacaan");
   }
   frame.width = 1440;
   await click('.bed-button[aria-label^="Bedengan 1,"]');
@@ -196,6 +212,43 @@ await test("kegagalan API tidak menjadi nilai dummy atau status Offline palsu", 
   await click('.sensor-marker[aria-label^="Sensor 701,"]');
   await waitFor(() => text().includes("55%"));
 });
+await test("pergantian sensor pada bedengan sama dan kembali cepat tidak menampilkan cache atau respons lama", async () => {
+  await state({ extraSensor: true });
+  frame.src = "/sensor?same-bed-monitoring=1";
+  await waitFor(() => doc()?.location.search.includes("same-bed-monitoring") && doc()?.querySelector(".bed-button") && !text().includes("Memuat daftar sensor"));
+  await click('.bed-button[aria-label^="Bedengan 6,"]');
+  const select = async (id) => {
+    [...doc().querySelectorAll("button")].find((item) => item.textContent.includes(`Sensor uji ${id}`)).click();
+    await delay(100);
+  };
+  await select(706); await waitFor(() => text().includes("60%"));
+  await state({ delay: 1400, delaySensorId: "707" });
+  await select(707);
+  assert(text().includes("Memuat pembacaan sensor") && !text().includes("60%") && !doc().querySelector("table"), "Data sensor pertama tertinggal saat memuat sensor kedua");
+  await state({ delaySensorId: "706" });
+  await select(706);
+  assert(text().includes("Memuat pembacaan sensor") && text().includes("Memuat grafik sensor") && !text().includes("60%") && !doc().querySelector("table"), "Cache sensor pertama muncul saat kembali sebelum request baru selesai");
+  await waitFor(() => text().includes("60%"));
+  assert(!text().includes("61%") && doc().querySelector('section[aria-label="Informasi sensor dan pengukuran global"] h2').textContent === "Sensor 706", "Respons terlambat menggantikan sensor aktif");
+  await state({ delay: 0, delaySensorId: "701" });
+});
+await test("empty state dan kegagalan riwayat/pH terpisah mempertahankan data kelembaban yang benar", async () => {
+  const select = async () => {
+    await click('.bed-button[aria-label^="Bedengan 1,"]');
+    await click('.sensor-marker[aria-label^="Sensor 701,"]');
+  };
+  await state({ emptyReadings: true }); await select();
+  await waitFor(() => text().includes("Belum ada pembacaan sensor."));
+  assert(text().includes("Belum ada data terbaru.") && text().includes("Data grafik belum tersedia."), "Empty state grafik/pembacaan hilang");
+  assert(!text().includes("0%"), "Data kosong diubah menjadi nol");
+  await state({ emptyReadings: false, logsError: true, phError: true, phHistoryError: true }); await select();
+  await waitFor(() => text().includes("55%") && text().includes("Riwayat pembacaan gagal dimuat."));
+  assert(text().includes("Data pH global gagal dimuat.") && text().includes("Riwayat pH global gagal dimuat."), "Error pH/riwayat hilang");
+  await waitFor(() => doc().querySelector('[aria-label="Grafik Monitoring"] .recharts-wrapper'));
+  assert(doc().querySelector('[aria-label="Grafik Monitoring"] .recharts-wrapper'), "Error riwayat/pH menghilangkan grafik kelembaban yang berhasil dimuat");
+  await state({ logsError: false, phError: false, phHistoryError: false }); await select();
+  await waitFor(() => text().includes("55%") && !text().includes("Riwayat pembacaan gagal dimuat."));
+});
 await test("polling 30 detik memperbarui nilai, status dan timestamp tanpa mengganti ID", async () => {
   await setAuth(true);
   buttonNamed("Atur Posisi Sensor").click();
@@ -217,19 +270,16 @@ await test("polling 30 detik memperbarui nilai, status dan timestamp tanpa mengg
   buttonNamed("Batal").click();
   await setAuth(false);
 });
-await test("metadata lokasi/bedengan belum lengkap tetap dapat dibaca tanpa marker tebakan", async () => {
+await test("metadata di luar peta tetap terdaftar tanpa membuka monitoring di luar bedengan aktif", async () => {
   await state({ missingLocation: true, invalidBed: true, moisture: 55, health: "online" });
   frame.src = "/sensor?metadata-incomplete=1";
   await waitFor(() => text().includes("Sensor di luar peta (2)"));
   const summary = [...doc().querySelectorAll("summary")].find((item) => item.textContent.includes("Sensor di luar peta"));
   summary.click();
-  const button = [...doc().querySelectorAll("button")].find((item) => item.textContent === "Sensor uji 706");
-  button.click();
-  await waitFor(() => text().includes("Sensor 706") && text().includes("60%"));
-  assert(text().includes("Lokasi belum tercatat") && doc().querySelectorAll(".sensor-marker").length === 0, "Lokasi/marker ditebak");
-  [...doc().querySelectorAll("button")].find((item) => item.textContent === "Sensor uji 705").click();
-  await waitFor(() => text().includes("Sensor 705") && text().includes("59%"));
-  assert(text().includes("Belum terpetakan (B1–B60)"), "Nomor bedengan ditebak");
+  assert(text().includes("Sensor uji 706") && text().includes("Sensor uji 705"), "Sensor di luar peta dihilangkan");
+  assert(![...doc().querySelectorAll("button")].some((item) => /Sensor uji 70[56]/.test(item.textContent)), "Sensor di luar bedengan aktif dapat dipilih");
+  assert(!doc().querySelector('[aria-label="Pembacaan Terbaru"], [aria-label="Grafik Monitoring"]'), "Sensor di luar peta membuka monitoring");
+  assert(doc().querySelector('.bed-button[aria-label^="Bedengan 1,"]').getAttribute("aria-pressed") === "true", "Bedengan aktif hilang");
 });
 await test("izin operator dan sensor terdaftar diperlukan untuk memulai pengeditan", async () => {
   await fetch("/__test__/reset", { method: "POST" });

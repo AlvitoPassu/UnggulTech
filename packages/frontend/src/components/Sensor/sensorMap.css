@@ -34,7 +34,8 @@
   pointer-events: none;
 }
 .bed-viewport { max-height: 580px; overscroll-behavior: contain; }
-.sensor-marker { scroll-margin: 60px; }
+.sensor-page section { scroll-margin-top: 89px; }
+.sensor-marker { scroll-margin: 89px 60px 60px; }
 @media (max-width: 639px) {
   .sensor-page main { padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); }
 }

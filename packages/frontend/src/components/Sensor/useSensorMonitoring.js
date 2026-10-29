@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSensors, getSensorData, getRecentLogs, getGlobalSoilPh, getGlobalSoilPhHistory, saveSensorPlacement } from "../../api/sensorApi";
-import { getBedNumber, getLocation, getMapLocation, isOutsideMap } from "./sensorMapModel";
+import { getMapLocation, sensorsForBed } from "./sensorMapModel";
 import { SensorPlacementRegistry } from "./sensorPlacementPersistence";
 
 // Preserve the existing 60s registry / 30s readings cadence. Cleanup rejects late
@@ -11,10 +11,10 @@ export default function useSensorMonitoring(selection) {
   const [readings, setReadings] = useState({ sensorId: "", loading: false });
   const [ph, setPh] = useState({ loading: true });
   const location = getMapLocation(registry.sensors);
-  const selectedSensor = registry.sensors.find((sensor) => String(sensor.id) === selection.sensorId
-    && (selection.bed === null ? isOutsideMap(sensor, location)
-      : getLocation(sensor) === location && getBedNumber(sensor.bedengan) === selection.bed));
+  const selectedSensor = (selection.bed ? sensorsForBed(registry.sensors, location, selection.bed) : [])
+    .find((sensor) => String(sensor.id) === selection.sensorId);
   const selectedSensorId = selectedSensor ? String(selectedSensor.id) : "";
+  const readingSelection = selectedSensorId ? selection : null;
 
   useEffect(() => {
     placementRegistry.activate();
@@ -39,7 +39,7 @@ export default function useSensorMonitoring(selection) {
         setPh({ loading: false, data: phResult.status === "fulfilled" ? phResult.value : null,
           history: historyResult.status === "fulfilled" ? historyResult.value : [],
           error: phResult.status === "rejected", historyError: historyResult.status === "rejected" });
-        setReadings({ sensorId: selectedSensorId, loading: false,
+        setReadings({ selection: readingSelection, sensorId: selectedSensorId, loading: false,
           data: dataResult?.status === "fulfilled" ? dataResult.value : null,
           logs: logsResult?.status === "fulfilled" ? logsResult.value : [],
           error: dataResult?.status === "rejected", logsError: logsResult?.status === "rejected" });
@@ -49,9 +49,12 @@ export default function useSensorMonitoring(selection) {
     void fetchData();
     const interval = setInterval(fetchData, 30_000);
     return () => { active = false; clearInterval(interval); };
-  }, [selectedSensorId]);
+  }, [selectedSensorId, readingSelection]);
 
-  return { registry, readings, ph, location, selectedSensor, selectedSensorId,
+  // Hide cached data immediately, even when A -> B -> A happens before B loads.
+  const currentReadings = readings.selection === readingSelection && readings.sensorId === selectedSensorId
+    ? readings : { sensorId: selectedSensorId, loading: Boolean(selectedSensorId) };
+  return { registry, readings: currentReadings, ph, location, selectedSensor, selectedSensorId,
     savePlacement: (id, payload) => placementRegistry.save(id, payload),
     refreshRegistry: () => placementRegistry.refresh() };
 }

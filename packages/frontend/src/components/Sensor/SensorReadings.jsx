@@ -29,30 +29,13 @@ function ReadingChart({ data, ph = false }) {
   </ResponsiveContainer></div>;
 }
 
-function SensorDetail({ sensor, readings, unavailable }) {
-  if (!sensor) return <div className="py-8 text-center"><FiActivity className="mx-auto mb-3 text-3xl text-slate-300" aria-hidden="true" />
-    <h2 className="text-lg font-bold text-slate-900">Informasi sensor</h2><p className="mt-2 text-sm text-slate-500">Pilih marker atau sensor terdaftar untuk melihat data monitoring.</p></div>;
-  const loading = readings.sensorId !== String(sensor.id);
-  const data = !loading ? readings.data : null;
-  const condition = conditionLabels[data?.condition || data?.status] || "Tidak tersedia";
-  const hasTemperature = readings.logs?.some((log) => log.temperature != null);
-  const hasHumidity = readings.logs?.some((log) => log.humidity != null);
+function SensorDetail({ sensor, data, loading, unavailable }) {
   return <>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-lg font-bold text-slate-900">Sensor {sensor.id}</h2><p className="mt-1 break-words text-sm text-slate-500">{sensor.sensor_name}</p></div>
       {!unavailable && <StatusBadge health={data?.sensorHealth} />}
     </div>
-    {loading ? <p role="status" className="mt-5 text-sm text-slate-500">Memuat pembacaan sensor…</p>
-      : readings.error || unavailable ? <p role="alert" className="mt-5 rounded-md bg-red-50 p-3 text-sm text-red-700">Data sensor gagal dimuat. Mencoba kembali pada pembaruan berikutnya.</p>
-        : <>
-          <div className="mt-5 rounded-lg border border-sky-100 bg-[#f3fbfe] p-4">
-            <p className="text-xs font-medium text-slate-500">Kelembaban tanah</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-[#1686b3]">{data?.moisture == null ? "—" : `${data.moisture}%`}</p>
-            <p className="mt-2 text-sm text-slate-600">{condition}{data?.needsAttention ? " · Perlu Perhatian" : ""}</p>
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">{!data?.lastSeen ? "Belum ada pembacaan sensor." : data.sensorHealth === "stale" ? "Pembacaan terakhir tersimpan; sensor berstatus Stale." : "Status mengikuti pembacaan terakhir dari backend."}</p>
-        </>}
-    <dl className="mt-4 space-y-4 text-sm">
+    <dl className="mt-4 grid min-w-0 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
       <div><dt className="text-xs text-slate-500">ID sensor</dt><dd className="mt-1 break-all font-medium">{sensor.id}</dd></div>
       <div><dt className="text-xs text-slate-500">Lokasi bibitan</dt><dd className="mt-1 break-words font-medium">{getLocation(sensor) || "Lokasi belum tercatat"}</dd></div>
       <div><dt className="text-xs text-slate-500">Nomor bedengan</dt><dd className="mt-1 font-medium">{getBedNumber(sensor.bedengan) ?? "Belum terpetakan (B1–B60)"}</dd></div>
@@ -61,27 +44,57 @@ function SensorDetail({ sensor, readings, unavailable }) {
       {!unavailable && data?.temperature != null && <div><dt className="text-xs text-slate-500">Suhu udara (DHT11, payload perangkat)</dt><dd className="mt-1 font-medium">{data.temperature}°C</dd></div>}
       {!unavailable && data?.humidity != null && <div><dt className="text-xs text-slate-500">Kelembaban udara (DHT11, payload perangkat)</dt><dd className="mt-1 font-medium">{data.humidity}%</dd></div>}
     </dl>
-    {!loading && !readings.error && !unavailable && <details className="mt-5 border-t border-slate-100 pt-4">
-      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-[#1686b3]">Grafik &amp; pembacaan terbaru</summary>
-      <p className="mt-2 text-xs text-slate-500">Soil Moisture · 10 data terbaru</p>
-      <ReadingChart data={data?.chart} />
-      {readings.logsError ? <p role="alert" className="mt-4 text-sm text-red-700">Riwayat pembacaan gagal dimuat.</p>
-        : readings.logs?.length ? <div className="mt-4 max-h-72 overflow-auto"><table className="w-full text-left text-xs">
-          <thead><tr className="text-slate-500"><th className="py-2 pr-3">Waktu (WITA)</th><th className="py-2 pr-3">Moisture</th>{hasTemperature && <th className="py-2 pr-3">Suhu udara</th>}{hasHumidity && <th className="py-2 pr-3">Kelembaban udara</th>}<th className="py-2">Kondisi</th></tr></thead>
-          <tbody>{readings.logs.map((log) => <tr key={log.id} className="border-t border-slate-100"><td className="py-3 pr-3">{log.time}</td><td className="py-3 pr-3">{log.moisture == null ? "—" : `${log.moisture}%`}</td>{hasTemperature && <td className="py-3 pr-3">{log.temperature == null ? "—" : `${log.temperature}°C`}</td>}{hasHumidity && <td className="py-3 pr-3">{log.humidity == null ? "—" : `${log.humidity}%`}</td>}<td className="py-3">{conditionLabels[log.condition || log.action] || "Tidak tersedia"}{log.needsAttention && " · Perlu Perhatian"}</td></tr>)}</tbody>
-        </table></div> : <p className="mt-4 text-sm text-slate-500">Belum ada data terbaru.</p>}
-    </details>}
   </>;
 }
 
+function RecentLogs({ logs, error }) {
+  const hasTemperature = logs?.some((log) => log.temperature != null);
+  const hasHumidity = logs?.some((log) => log.humidity != null);
+  return error ? <p role="alert" className="mt-4 text-sm text-red-700">Riwayat pembacaan gagal dimuat.</p>
+    : logs?.length ? <div className="mt-4 max-h-72 overflow-auto"><table className="w-full text-left text-xs" aria-label="Pembacaan terbaru sensor terpilih">
+      <thead><tr className="text-slate-500"><th className="py-2 pr-3">Waktu (WITA)</th><th className="py-2 pr-3">Moisture</th>{hasTemperature && <th className="py-2 pr-3">Suhu udara</th>}{hasHumidity && <th className="py-2 pr-3">Kelembaban udara</th>}<th className="py-2">Kondisi</th></tr></thead>
+      <tbody>{logs.map((log) => <tr key={log.id} className="border-t border-slate-100"><td className="py-3 pr-3">{log.time}</td><td className="py-3 pr-3">{log.moisture == null ? "—" : `${log.moisture}%`}</td>{hasTemperature && <td className="py-3 pr-3">{log.temperature == null ? "—" : `${log.temperature}°C`}</td>}{hasHumidity && <td className="py-3 pr-3">{log.humidity == null ? "—" : `${log.humidity}%`}</td>}<td className="py-3">{conditionLabels[log.condition || log.action] || "Tidak tersedia"}{log.needsAttention && " · Perlu Perhatian"}</td></tr>)}</tbody>
+    </table></div> : <p className="mt-4 text-sm text-slate-500">Belum ada data terbaru.</p>;
+}
+
 export default function SensorReadings({ sensor, readings, ph, unavailable }) {
+  if (!sensor) return <div className="py-8 text-center"><FiActivity className="mx-auto mb-3 text-3xl text-slate-300" aria-hidden="true" />
+    <h2 className="text-lg font-bold text-slate-900">Informasi sensor</h2><p role="status" className="mt-2 text-sm text-slate-500">Pilih sensor pada peta bedengan untuk melihat grafik monitoring dan pembacaan terbaru.</p></div>;
+  const loading = Boolean(readings.loading || readings.sensorId !== String(sensor.id));
+  const failed = readings.error || unavailable;
+  const data = !loading && !failed ? readings.data : null;
+  const condition = conditionLabels[data?.condition || data?.status] || "Tidak tersedia";
   const phHistory = (ph.history || []).map((reading) => ({ ...reading, time: formatTimestamp(reading.measuredAt) }));
   return <>
-    <SensorDetail key={sensor?.id || "none"} sensor={sensor} readings={readings} unavailable={unavailable} />
-    <div className="mt-6 border-t border-slate-200 pt-5">
-      <h2 className="text-sm font-bold text-slate-900">pH Tanah — Pengukuran Global</h2><p className="mt-1 text-xs leading-5 text-slate-500">Satu pengukuran untuk seluruh bedengan, tidak mewakili titik sensor Soil Moisture yang dipilih.</p>
-      {ph.loading ? <p role="status" className="mt-3 text-sm text-slate-500">Memuat pH global…</p> : ph.error ? <p role="alert" className="mt-3 text-sm text-red-700">Data pH global gagal dimuat.</p> : <><p className="mt-3 text-2xl font-bold text-emerald-600">{ph.data?.soilPh == null ? "—" : Number(ph.data.soilPh).toFixed(2)}</p><p className="mt-1 text-xs text-slate-500">{ph.data?.status === "active" ? "Aktif" : ph.data?.status === "inactive" ? "Tidak Aktif" : "Belum Ada Data"} · {formatTimestamp(ph.data?.measuredAt)}</p></>}
-      <details className="mt-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-emerald-700">Grafik pH global</summary>{ph.historyError ? <p role="alert" className="text-sm text-red-700">Riwayat pH global gagal dimuat.</p> : <ReadingChart data={phHistory} ph />}</details>
-    </div>
+    <SensorDetail sensor={sensor} data={data} loading={loading} unavailable={unavailable} />
+    <section className="mt-6 min-w-0 border-t border-slate-200 pt-5" aria-label="Pembacaan Terbaru">
+      <h3 className="text-base font-bold text-slate-900">Pembacaan Terbaru</h3>
+      <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="min-w-0 rounded-lg border border-sky-100 bg-[#f3fbfe] p-4">
+          <h4 className="text-sm font-bold text-slate-900">Kelembaban tanah — Sensor {sensor.id}</h4>
+          {loading ? <p role="status" className="mt-3 text-sm text-slate-500">Memuat pembacaan sensor…</p>
+            : failed ? <p role="alert" className="mt-3 text-sm text-red-700">Data sensor gagal dimuat. Mencoba kembali pada pembaruan berikutnya.</p>
+              : <><p className="mt-3 text-3xl font-bold tracking-tight text-[#1686b3]">{data?.moisture == null ? "—" : `${data.moisture}%`}</p>
+                <p className="mt-2 text-sm text-slate-600">{condition}{data?.needsAttention ? " · Perlu Perhatian" : ""}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">{!data?.lastSeen ? "Belum ada pembacaan sensor." : data.sensorHealth === "stale" ? "Pembacaan terakhir tersimpan; sensor berstatus Stale." : "Status mengikuti pembacaan terakhir dari backend."}</p></>}
+        </div>
+        <div className="min-w-0 rounded-lg border border-emerald-100 bg-emerald-50/50 p-4">
+          <h4 className="text-sm font-bold text-slate-900">pH Tanah — Pengukuran Global</h4><p className="mt-1 text-xs leading-5 text-slate-500">Satu pengukuran untuk seluruh bedengan, tidak mewakili titik sensor Soil Moisture yang dipilih.</p>
+          {ph.loading ? <p role="status" className="mt-3 text-sm text-slate-500">Memuat pH global…</p> : ph.error ? <p role="alert" className="mt-3 text-sm text-red-700">Data pH global gagal dimuat.</p> : <><p className="mt-3 text-2xl font-bold text-emerald-600">{ph.data?.soilPh == null ? "—" : Number(ph.data.soilPh).toFixed(2)}</p><p className="mt-1 text-xs text-slate-500">{ph.data?.status === "active" ? "Aktif" : ph.data?.status === "inactive" ? "Tidak Aktif" : "Belum Ada Data"} · {formatTimestamp(ph.data?.measuredAt)}</p></>}
+        </div>
+      </div>
+      {!loading && <RecentLogs logs={readings.logs} error={readings.logsError || unavailable} />}
+    </section>
+    <section className="mt-6 min-w-0 border-t border-slate-200 pt-5" aria-label="Grafik Monitoring">
+      <h3 className="text-base font-bold text-slate-900">Grafik Monitoring</h3>
+      <div className="mt-4 grid min-w-0 gap-6 md:grid-cols-2">
+        <div className="min-w-0"><h4 className="text-sm font-semibold text-[#1686b3]">Soil Moisture — Sensor {sensor.id}</h4><p className="mt-1 text-xs text-slate-500">10 data terbaru · Kelembaban tanah (%)</p>
+          {loading ? <p role="status" className="mt-4 text-sm text-slate-500">Memuat grafik sensor…</p> : failed ? <p role="alert" className="mt-4 text-sm text-red-700">Grafik sensor gagal dimuat.</p> : <ReadingChart data={data?.chart} />}
+        </div>
+        <div className="min-w-0"><h4 className="text-sm font-semibold text-emerald-700">Grafik pH global</h4><p className="mt-1 text-xs text-slate-500">Pengukuran global untuk seluruh bedengan</p>
+          {ph.loading ? <p role="status" className="mt-4 text-sm text-slate-500">Memuat grafik pH global…</p> : ph.historyError ? <p role="alert" className="mt-4 text-sm text-red-700">Riwayat pH global gagal dimuat.</p> : <ReadingChart data={phHistory} ph />}
+        </div>
+      </div>
+    </section>
   </>;
 }

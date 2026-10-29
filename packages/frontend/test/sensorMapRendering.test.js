@@ -42,6 +42,8 @@ test("Sensor page immediately renders 60 beds without nursery controls even with
     assert.match(page, /Sensor 991/);
     assert.match(page, /Sensor 992/);
     assert.doesNotMatch(page, /class="sensor-marker/);
+    assert.match(page, /Pilih sensor pada peta bedengan untuk melihat grafik monitoring dan pembacaan terbaru\./);
+    assert.doesNotMatch(page, /aria-label="Grafik Monitoring"|aria-label="Pembacaan Terbaru"|Pengukuran Global/);
   } finally { await vite.close(); }
 });
 
@@ -130,5 +132,23 @@ test("rendered mapping exposes real markers, empty/error states and global pH se
     }));
     assert.match(previous, /Memuat pembacaan sensor/);
     assert.doesNotMatch(previous, /55%/);
+    const cached = {
+      sensorId: "701", data: { moisture: 55, temperature: 27, chart: [{ time: "08:00", moisture: 55 }] },
+      logs: [{ id: 1, moisture: 55, temperature: 27, time: "Pembacaan lama" }],
+    };
+    for (const readings of [{ ...cached, loading: true }, { ...cached, sensorId: "702" }]) {
+      const pending = renderToStaticMarkup(createElement(SensorReadings, { sensor, readings, ph: {} }));
+      assert.match(pending, /Memuat pembacaan sensor/);
+      assert.match(pending, /Memuat grafik sensor/);
+      assert.doesNotMatch(pending, /55%|27°C|Pembacaan lama|<table/);
+    }
+    const unselected = renderToStaticMarkup(createElement(SensorReadings, {
+      readings: cached, ph: { data: { soilPh: 6.4 }, history: [{ soilPh: 6.4 }] },
+    }));
+    assert.match(unselected, /Pilih sensor pada peta bedengan/);
+    assert.doesNotMatch(unselected, /55%|6\.40|Grafik Monitoring|Pembacaan Terbaru|<table/);
+    assert.ok(detail.indexOf('aria-label="Pembacaan Terbaru"') < detail.indexOf('aria-label="Grafik Monitoring"'));
+    assert.match(detail, /Belum ada data terbaru/);
+    assert.match(detail, /Data grafik belum tersedia/);
   } finally { await vite.close(); }
 });

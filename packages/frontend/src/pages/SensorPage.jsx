@@ -25,7 +25,7 @@ export default function SensorPage() {
   });
   const bedSensors = sensorsForBed(registry.sensors, location, selection.bed);
   const unassigned = registry.sensors.filter((sensor) => isOutsideMap(sensor, location));
-  const chooseBed = (bed) => setSelection({ bed, sensorId: "" });
+  const chooseBed = (bed) => setSelection((previous) => previous.bed === bed && !previous.sensorId ? previous : { bed, sensorId: "" });
 
   return <div className="sensor-page min-h-screen min-w-0 bg-[#F5F6F8] text-slate-800">
     <header className="sticky top-0 z-30 h-[73px] border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
@@ -47,7 +47,7 @@ export default function SensorPage() {
         <p className="mt-3 text-xs leading-5 text-slate-500">Layout awal bibitan · Garis abu-abu menunjukkan jalur pipa dan sumisamsuwi. Titik biru kecil menandai bedengan dengan sensor terdaftar.</p>
       </section>
 
-      <div className="mt-6 grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
+      <div className="mt-6 min-w-0 space-y-6">
         <section className={panelClass} aria-label="Detail bedengan terpilih">
           {selection.bed ? <BedMap key={`${location}:${selection.bed}`} bed={selection.bed} sensors={bedSensors} selectedSensorId={selectedSensorId}
             canEditPosition={isAuthenticated && secondsRemaining > 0}
@@ -55,14 +55,14 @@ export default function SensorPage() {
             editorSessionKey={sessionId} onSavePosition={savePosition} onRefreshPosition={refreshRegistry}
             placementOperation={registry.operations?.[selectedSensorId]}
             registryState={registry.loading ? "loading" : registry.error ? "error" : "ready"}
-            onSelect={(sensorId) => setSelection({ bed: selection.bed, sensorId })} />
+            onSelect={(sensorId) => setSelection((previous) => previous.sensorId === sensorId ? previous : { bed: previous.bed, sensorId })} />
             : <p className="text-sm text-slate-500">Sensor ini berada di luar lokasi atau layout peta B1–B60. Pilih bedengan pada peta untuk melanjutkan.</p>}
-          {unassigned.length > 0 && <details className="mt-5 border-t border-slate-100 pt-4"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-600">Sensor di luar peta ({unassigned.length})</summary><p className="mt-1 text-xs text-slate-500">Lokasi atau nomor bedengan belum sesuai dengan peta ini. Informasi sensor tetap dapat diakses.</p><div className="mt-3 flex flex-wrap gap-2">{unassigned.map((sensor) => <button key={sensor.id} type="button" className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm" aria-pressed={String(sensor.id) === selectedSensorId} onClick={() => setSelection({ bed: null, sensorId: String(sensor.id) })}>{sensor.sensor_name || `Sensor ${sensor.id}`}</button>)}</div></details>}
         </section>
 
         <section className={panelClass} aria-label="Informasi sensor dan pengukuran global">
           <SensorReadings sensor={selectedSensor} readings={readings} ph={ph} unavailable={registry.error} />
         </section>
+        {unassigned.length > 0 && <details className={panelClass}><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-600">Sensor di luar peta ({unassigned.length})</summary><p className="mt-1 text-xs text-slate-500">Lokasi atau nomor bedengan belum sesuai dengan peta ini. Monitoring hanya tersedia untuk sensor pada bedengan aktif.</p><ul className="mt-3 flex flex-wrap gap-2">{unassigned.map((sensor) => <li key={sensor.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">{sensor.sensor_name || `Sensor ${sensor.id}`}</li>)}</ul></details>}
       </div>
     </main>
   </div>;

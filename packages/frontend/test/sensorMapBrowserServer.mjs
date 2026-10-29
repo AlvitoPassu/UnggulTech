@@ -16,7 +16,7 @@ const registry = [
   { id: 705, sensor_name: "Sensor uji 705", bedengan: "5", location: "Nursery pengujian", placement: { row: 11, column: 40 } },
   { id: 706, sensor_name: "Sensor uji 706", bedengan: "6", location: "Nursery pengujian", placement: null },
 ].map((sensor) => ({ ...sensor, status: "Active" }));
-const initialState = () => ({ calls: {}, writes: [], extraSensor: false, moisture: 55, health: "online", detailError: false, registryError: false, empty: false, missingLocation: false, invalidBed: false, delay: 0, measuredAt: new Date().toISOString(),
+const initialState = () => ({ calls: {}, writes: [], extraSensor: false, moisture: 55, health: "online", detailError: false, logsError: false, emptyReadings: false, phError: false, phHistoryError: false, registryError: false, empty: false, missingLocation: false, invalidBed: false, delay: 0, delaySensorId: "701", measuredAt: new Date().toISOString(),
   placementMode: "json", placements: {}, placementStates: {}, writeEnabled: true, saveStatus: 200, saveCode: "",
   writeDelay: 0, registryDelay: 0, registryStale: false, malformedSave: false });
 let state = initialState();
@@ -97,8 +97,8 @@ const server = httpServer(async (req, res) => {
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       return json(sensors, status);
     }
-    if (path === "/api/sensors/ph") return json({ soilPh: 6.4, status: "active", measuredAt: state.measuredAt });
-    if (path === "/api/sensors/ph/history") return json({ readings: [{ soilPh: 6.4, measuredAt: state.measuredAt }] });
+    if (path === "/api/sensors/ph") return json({ soilPh: 6.4, status: "active", measuredAt: state.measuredAt }, state.phError ? 503 : 200);
+    if (path === "/api/sensors/ph/history") return json({ readings: [{ soilPh: 6.4, measuredAt: state.measuredAt }] }, state.phHistoryError ? 503 : 200);
     const match = /^\/api\/sensors\/(\d+)\/(data|recent-logs)$/.exec(path);
     if (match) {
       const sensor = fixtureRegistry().find((item) => String(item.id) === match[1]);
@@ -106,8 +106,10 @@ const server = httpServer(async (req, res) => {
       const snapshot = { ...state };
       // Distinct values expose requests accidentally sent with a previous sensor ID.
       const moisture = snapshot.moisture + sensor.id - 701;
-      if (snapshot.delay && match[1] === "701") await new Promise((resolve) => setTimeout(resolve, snapshot.delay));
+      if (snapshot.delay && match[1] === snapshot.delaySensorId) await new Promise((resolve) => setTimeout(resolve, snapshot.delay));
       if (snapshot.detailError) return json({ message: "Expected test error" }, 503);
+      if (snapshot.logsError && match[2] === "recent-logs") return json({ message: "Expected logs error" }, 503);
+      if (snapshot.emptyReadings) return json(match[2] === "recent-logs" ? [] : { sensor, moisture: null, chart: [], lastSeen: null });
       if (match[2] === "recent-logs") return json([{ id: 1, moisture, condition: "normal", time: "27 Okt 2026 08:00:00" }]);
       return json({ sensor, moisture, temperature: null, humidity: null, condition: "normal", needsAttention: false,
         sensorHealth: snapshot.health, isOnline: snapshot.health === "online", lastSeen: snapshot.measuredAt,
@@ -117,11 +119,11 @@ const server = httpServer(async (req, res) => {
   }
   vite.middlewares(req, res);
 });
-const vite = await createServer({ root, configFile: false, plugins: [{
+const vite = await createServer({ root, configFile: false, envDir: false, plugins: [{
   // Only this isolated test server replaces the auth hook. Production auth is untouched.
   name: "sensor-position-test-auth", enforce: "pre",
   transformIndexHtml() {
-    return [{ tag: "script", injectTo: "head-prepend", children: `
+    return [{ tag: "meta", attrs: { "http-equiv": "Content-Security-Policy", content: "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:*; img-src 'self' data: blob:;" }, injectTo: "head-prepend" }, { tag: "script", injectTo: "head-prepend", children: `
       let reportedBootError = false;
       const reportBootError = event => {
         const message = event.message || event.reason?.stack || event.reason;
