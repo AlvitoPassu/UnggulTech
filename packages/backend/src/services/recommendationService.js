@@ -4,6 +4,8 @@ import { getSensorData } from "./sensorService.js";
 import { getLatestSoilPh } from "./soilPhService.js";
 import { getWeatherForecast } from "./weatherService.js";
 import { generateRecommendationNarratives } from "./recommendationNarrativeService.js";
+import { retrieveKnowledge } from "./knowledgeBaseService.js";
+import { withAiTimeout } from "./agronomyAnalysisService.js";
 
 const getNearestForecast = (forecasts = []) => {
   if (!Array.isArray(forecasts) || !forecasts.length) return null;
@@ -17,10 +19,7 @@ const getNearestForecast = (forecasts = []) => {
 };
 
 const getRecommendationForecast = () => {
-  if (!process.env.GEMINI_API_KEY) return Promise.resolve([]);
-
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Permintaan prakiraan cuaca melebihi batas waktu.")), 8000));
-  return Promise.race([getWeatherForecast(), timeout]).catch(() => []);
+  return withAiTimeout(Promise.resolve().then(() => getWeatherForecast()), 3000).catch(() => []);
 };
 
 /**
@@ -30,8 +29,8 @@ const getRecommendationForecast = () => {
 export async function getRecommendationForSensor(sensorId) {
   const [sensorData, rainfall, soilPh, forecasts] = await Promise.all([
     getSensorData(sensorId),
-    getLatestRainfall(),
-    getLatestSoilPh().catch(() => null),
+    withAiTimeout(getLatestRainfall(), 3000).catch(() => null),
+    withAiTimeout(getLatestSoilPh(), 3000).catch(() => null),
     getRecommendationForecast(),
   ]);
   const sensor = sensorData.sensor ?? {};
@@ -46,20 +45,30 @@ export async function getRecommendationForSensor(sensorId) {
     },
   });
   const weather = getNearestForecast(forecasts);
+  const query = `Analisis pemeliharaan pembibitan: kelembapan soil moisture ${decisionResult.moisture.condition || "tidak tersedia"}; penyiraman; pH; curah hujan; cuaca.`;
+  // No reliable structured age/phase field currently exists on the sensor record.
+  const knowledge = await retrieveKnowledge({ query, plantPhase: "general" });
   const narrativeContext = {
     decision: decisionResult.decision,
     moisture: decisionResult.moisture,
     sensorHealth: decisionResult.sensorHealth,
     rainfall: decisionResult.rainfall,
     soilPh,
+    plantPhase: "general",
+    plantAge: null,
+    measuredAt: sensorData.lastSeen ?? null,
+    temperature: sensorData.latest?.temperature ?? null,
+    humidity: sensorData.latest?.humidity ?? null,
+    knowledge,
     weather: weather ? {
-      timestamp: weather.local_datetime || weather.utc_datetime,
+      type: "forecast",
+      timestamp: weather.utc_datetime || weather.local_datetime,
       description: weather.weather,
       temperature: weather.temperature,
       humidity: weather.humidity,
     } : null,
   };
-  const { generalRecommendations, decisionNarrative } = await generateRecommendationNarratives(narrativeContext);
+  const { generalRecommendations, decisionNarrative, analysis } = await generateRecommendationNarratives(narrativeContext);
 
   return {
     sensor: {
@@ -71,5 +80,8 @@ export async function getRecommendationForSensor(sensorId) {
     ...decisionResult,
     generalRecommendations,
     decisionNarrative,
+    analysis,
+    knowledge: { status: knowledge.status, method: knowledge.method, count: knowledge.chunks.length },
+    sopComparison: decisionResult.decision,
   };
 }

@@ -1,3 +1,6 @@
+import AgronomyAnalysis from "../AI/AgronomyAnalysis";
+import { isAgronomyAnalysis } from "../../lib/agronomyAnalysis";
+
 const ChatMessage = ({ message }) => {
   const isUser = message.role === "user";
 
@@ -10,7 +13,7 @@ const ChatMessage = ({ message }) => {
             : "rounded-bl-md border border-slate-100 bg-slate-50 text-slate-700 shadow-sm"
         }`}
       >
-        {message.content}
+        {!isUser && isAgronomyAnalysis(message.analysis) ? <AgronomyAnalysis analysis={message.analysis} /> : message.content}
         <p className={`mt-1 text-[10px] ${isUser ? "text-white/75" : "text-slate-400"}`}>{message.time}</p>
       </div>
     </div>

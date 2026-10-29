@@ -22,6 +22,7 @@ const ChatbotAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
+  const requestInFlightRef = useRef(false);
 
   const scrollToMessage = (messageId, behavior = "smooth") => {
     if (!messagesContainerRef.current) return;
@@ -145,7 +146,8 @@ const ChatbotAssistant = () => {
 
   const sendMessage = async (value = input) => {
     const question = value.trim();
-    if (!question || isLoading) return;
+    if (!question || requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: question, time: timeLabel() }]);
     setInput("");
     if (textareaRef.current) {
@@ -153,15 +155,15 @@ const ChatbotAssistant = () => {
     }
     setIsLoading(true);
     try {
-      const { reply } = await sendChatbotMessage(question);
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: reply, time: timeLabel() }]);
+      const { reply, analysis } = await sendChatbotMessage(question);
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: typeof reply === "string" ? reply : "Analisis belum tersedia.", analysis, time: timeLabel() }]);
     } catch (error) {
-      console.error("Chatbot error:", error);
       const message = error.response?.status === 503
-        ? "Layanan AI belum dikonfigurasi. Hubungi administrator untuk menambahkan GEMINI_API_KEY di backend."
+        ? "Layanan AI belum tersedia. Silakan coba lagi nanti atau hubungi administrator."
         : "Maaf, saya sedang mengalami kendala saat menghubungkan ke AI. Silakan coba lagi.";
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: message, time: timeLabel() }]);
     } finally {
+      requestInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -250,9 +252,9 @@ const ChatbotAssistant = () => {
                 </div>
               )}
               {isLoading && (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
+                <div className="flex items-center gap-2 text-sm text-slate-500" role="status" aria-live="polite">
                   <FiRefreshCw className="animate-spin text-[#1DAADF]" />
-                  AI sedang menganalisis data...
+                  AI sedang menganalisis data. Proses dapat memerlukan hingga satu menit.
                 </div>
               )}
             </div>

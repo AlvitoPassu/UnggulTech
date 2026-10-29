@@ -30,6 +30,8 @@ import { createRainfallReading, getRainfallTrend } from "../api/rainfallApi";
 import { getRecommendationDecision } from "../api/recommendationApi";
 import { useAuth } from "../context/AuthContext";
 import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
+import AgronomyAnalysis from "../components/AI/AgronomyAnalysis";
+import { isAgronomyAnalysis } from "../lib/agronomyAnalysis";
 
 const panelClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
 const STORAGE_KEY = "unggul-ai-recommendation-history";
@@ -551,7 +553,7 @@ const RecommendationAIPage = () => {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">Unggul Monitoring</p>
-              <p className="mt-0.5 truncate text-xs text-white/80">Rekomendasi tindakan berbasis data dan SOP operasional</p>
+              <p className="mt-0.5 truncate text-xs text-white/80">Analisis data aktual dan research pembibitan</p>
             </div>
           </div>
 
@@ -564,10 +566,11 @@ const RecommendationAIPage = () => {
               <button
                 type="button"
                 onClick={() => setRefreshToken((value) => value + 1)}
-                className="rounded-md p-2 text-white transition hover:bg-white/15"
+                disabled={loading || (recommendationLoading && selectedBedengan !== "all" && Boolean(selectedSensorId))}
+                className="rounded-md p-2 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Refresh rekomendasi"
               >
-                <FiRefreshCw className={loading ? "animate-spin" : ""} aria-hidden="true" />
+                <FiRefreshCw className={loading || (recommendationLoading && selectedBedengan !== "all" && selectedSensorId) ? "animate-spin" : ""} aria-hidden="true" />
               </button>
             </div>
             <HeaderAuthStatus />
@@ -728,51 +731,57 @@ const RecommendationAIPage = () => {
           <div className={`${panelClass} p-5 sm:p-6`}>
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <p className="mb-1 text-sm font-medium text-[#1DAADF]">SOP / Keputusan</p>
+                <p className="mb-1 text-sm font-medium text-[#1DAADF]">Data Aktual / Research</p>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">Rekomendasi Tindakan</h2>
               </div>
-              <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide ${toneClasses[getDecisionTone(recommendation.code)]}`}>
+              {!isAgronomyAnalysis(activeRecommendationData?.analysis) && <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide ${toneClasses[getDecisionTone(recommendation.code)]}`}>
                 {recommendation.code || "MENUNGGU"}
-              </span>
+              </span>}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Hasil keputusan</p>
-              <p className="mt-3 break-words text-2xl font-bold text-slate-900 sm:text-3xl">{recommendation.title}</p>
-              {recommendation.code === "water" && (
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white p-3 border border-slate-200">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Durasi</p>
-                    <p className="mt-2 text-lg font-bold text-slate-900">{recommendation.durationMinutes} menit</p>
-                  </div>
-                  <div className="rounded-xl bg-white p-3 border border-slate-200">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Waktu</p>
-                    <p className="mt-2 text-lg font-bold text-slate-900">{recommendation.schedule.map((item) => item.charAt(0).toUpperCase() + item.slice(1)).join(" & ")}</p>
-                  </div>
-                </div>
-              )}
-              <div className="mt-4 rounded-xl bg-white p-3 border border-slate-200">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Penjelasan keputusan</p>
-                <p className="mt-2 break-words text-sm leading-7 text-slate-700">{decisionNarrative}</p>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <h3 className="mb-3 text-base font-bold text-slate-900">Rekomendasi umum</h3>
-              <ol className="space-y-5 text-sm text-slate-700">
-                {generalRecommendations.length ? generalRecommendations.map((item, index) => (
-                  <li key={`${item.title}-${index}`} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
-                    <span className="font-semibold text-slate-900">{index + 1}.</span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">{item.title}</p>
-                      <p className="mt-2 leading-6 text-slate-700">{item.description}</p>
+            {recommendationLoading && selectedBedengan !== "all" && selectedSensorId && <p className="mb-4 flex items-center gap-2 text-sm text-slate-500" role="status" aria-live="polite"><FiRefreshCw className="animate-spin text-[#1DAADF]" aria-hidden="true" />AI sedang menganalisis data. Proses dapat memerlukan hingga satu menit.</p>}
+            {isAgronomyAnalysis(activeRecommendationData?.analysis) && <AgronomyAnalysis analysis={activeRecommendationData.analysis} />}
+            <details className="mt-4" open={isAgronomyAnalysis(activeRecommendationData?.analysis) ? undefined : true}>
+              <summary className="mb-3 cursor-pointer text-sm font-semibold text-slate-600">Pembanding SOP operasional</summary>
+              <p className="mb-3 text-xs text-slate-500">Aturan sistem existing. Validasi kondisi lapangan dan analisis di atas sebelum menerapkan durasi atau jadwal SOP.</p>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <p className="text-xs font-medium uppercase tracking-[0.15em] text-slate-500">Hasil keputusan</p>
+                <p className="mt-3 break-words text-2xl font-bold text-slate-900 sm:text-3xl">{recommendation.title}</p>
+                {recommendation.code === "water" && (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-xl bg-white p-3 border border-slate-200">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Durasi</p>
+                      <p className="mt-2 text-lg font-bold text-slate-900">{recommendation.durationMinutes} menit</p>
                     </div>
-                  </li>
-                )) : (
-                  <li className="text-slate-500">Rekomendasi umum belum tersedia.</li>
+                    <div className="rounded-xl bg-white p-3 border border-slate-200">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Waktu</p>
+                      <p className="mt-2 text-lg font-bold text-slate-900">{recommendation.schedule.map((item) => item.charAt(0).toUpperCase() + item.slice(1)).join(" & ")}</p>
+                    </div>
+                  </div>
                 )}
-              </ol>
-            </div>
+                <div className="mt-4 rounded-xl bg-white p-3 border border-slate-200">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Penjelasan keputusan</p>
+                  <p className="mt-2 break-words text-sm leading-7 text-slate-700">{isAgronomyAnalysis(activeRecommendationData?.analysis) ? recommendation.reason : decisionNarrative}</p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="mb-3 text-base font-bold text-slate-900">Rekomendasi umum</h3>
+                <ol className="space-y-5 text-sm text-slate-700">
+                  {generalRecommendations.length ? generalRecommendations.map((item, index) => (
+                    <li key={`${item.title}-${index}`} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
+                      <span className="font-semibold text-slate-900">{index + 1}.</span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">{item.title}</p>
+                        <p className="mt-2 leading-6 text-slate-700">{item.description}</p>
+                      </div>
+                    </li>
+                  )) : (
+                    <li className="text-slate-500">Rekomendasi umum belum tersedia.</li>
+                  )}
+                </ol>
+              </div>
+            </details>
           </div>
 
           <aside className={`${panelClass} p-5 sm:p-6`}>
@@ -792,7 +801,7 @@ const RecommendationAIPage = () => {
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Kelembaban Tanah</span><strong>{moistureValue === null || Number.isNaN(moistureValue) ? "-" : `${Math.round(moistureValue)}%`}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>pH Tanah</span><strong>{phValue === null || Number.isNaN(phValue) ? "Data belum tersedia" : phValue.toFixed(2)}</strong></li>
                   <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Curah Hujan</span><strong>{Number.isFinite(rainfallValue) ? `${rainfallValue.toFixed(1)} mm` : "Data belum tersedia"}</strong></li>
-                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Probabilitas Hujan</span><strong>{nextForecast?.humidity ? `${nextForecast.humidity}%` : "Data tidak tersedia"}</strong></li>
+                  <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"><span>Kelembapan Udara (Prakiraan)</span><strong>{Number.isFinite(nextForecast?.humidity) ? `${nextForecast.humidity}%` : "Data tidak tersedia"}</strong></li>
                 </ul>
               </div>
 
@@ -809,7 +818,8 @@ const RecommendationAIPage = () => {
                   <li>✓ Kelembaban tanah</li>
                   <li>✓ pH tanah</li>
                   <li>✓ Curah hujan</li>
-                  <li>✓ SOP penyiraman</li>
+                  <li>✓ Research jika relevan tersedia</li>
+                  <li>✓ SOP sebagai pembanding</li>
                   <li>✓ Prakiraan cuaca jika tersedia</li>
                 </ul>
               </div>

@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
+import { generateAgronomyAnalysis } from "./agronomyAnalysisService.js";
 
-const recommendationInstruction = `Anda menyusun penjelasan keputusan dan rekomendasi umum untuk petugas nursery bibit kelapa sawit.
+const recommendationInstruction = `Anda menyusun narasi pembanding SOP lama untuk petugas nursery bibit kelapa sawit. Ini bukan analisis research utama. Analisis utama menggunakan schema agronomi dan research pada service bersama.
 Gunakan HANYA data pada JSON konteks. Jangan mengarang angka, status, dosis, volume air, interval, standar agronomi, atau kondisi yang tidak ada pada konteks.
 Keputusan operasional pada field decision sudah ditetapkan oleh aturan sistem dan tidak boleh diubah. Field decisionNarrative hanya boleh menjelaskan keputusan tersebut: jangan mengganti, memperluas, atau memberi tindakan yang bertentangan dengan decision.code maupun decision.title. Khusus keputusan periksa bedengan atau data tidak tersedia, jangan memerintahkan penyiraman. Jika data sensor atau curah hujan tidak tersedia/terbaru, utamakan pemeriksaan atau pelengkapan data sebelum tindakan lapangan.
 
@@ -227,7 +228,7 @@ export const parseRecommendationNarrativeResponse = (text, decision = {}) => {
   }
 };
 
-const requestGeminiNarratives = (context, apiKey) => {
+const requestGeminiNarratives = (context, apiKey, timeoutMs) => {
   const ai = new GoogleGenAI({ apiKey });
   return ai.models.generateContent({
     model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
@@ -235,6 +236,7 @@ const requestGeminiNarratives = (context, apiKey) => {
     config: {
       systemInstruction: recommendationInstruction,
       responseMimeType: "application/json",
+      httpOptions: { timeout: timeoutMs },
     },
   });
 };
@@ -257,7 +259,19 @@ const withTimeout = (request, timeoutMs, message) => new Promise((resolve, rejec
  * Menambah narasi presentasi tanpa pernah mengubah keputusan deterministik.
  * `request` hanya digunakan untuk test agar kegagalan provider dapat disimulasikan.
  */
-export async function generateRecommendationNarratives(context, { apiKey, request, timeoutMs = 20000 } = {}) {
+export async function generateRecommendationNarratives(context, { apiKey, request, timeoutMs = 60000 } = {}) {
+  if (context.knowledge) {
+    const analysis = await generateAgronomyAnalysis(context, {
+      ...(apiKey !== undefined ? { apiKey } : {}), request, timeoutMs,
+    });
+    return {
+      analysis,
+      // Preserve transport fields for old clients, but use evidence-aware actions.
+      generalRecommendations: [...analysis.solutions.map((item) => `${item.action}\n\n${item.reason}`),
+        ...analysis.prevention.map((item) => `${item.action}\n\nCatat hasil pemantauan untuk evaluasi lanjutan.`)],
+      decisionNarrative: analysis.problem.summary,
+    };
+  }
   const fallback = {
     generalRecommendations: buildFallbackGeneralRecommendations(context),
     decisionNarrative: buildFallbackDecisionNarrative(context),
@@ -268,11 +282,10 @@ export async function generateRecommendationNarratives(context, { apiKey, reques
   try {
     const providerRequest = request
       ? request(context)
-      : requestGeminiNarratives(context, resolvedApiKey);
+      : requestGeminiNarratives(context, resolvedApiKey, timeoutMs);
     const response = await withTimeout(providerRequest, timeoutMs, "Permintaan Recommendation AI melebihi batas waktu.");
     return parseRecommendationNarrativeResponse(response?.text, context?.decision) || fallback;
-  } catch (error) {
-    console.error("Recommendation AI fallback:", error.message || error);
+  } catch {
     return fallback;
   }
 }
