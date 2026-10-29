@@ -9,6 +9,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "node --test test/*.test.js",
+    "test:sensor-browser": "node test/sensorMapBrowserRunner.mjs",
+    "test:sensor-e2e": "node test/sensorPlacementE2ERunner.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

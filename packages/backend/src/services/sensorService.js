@@ -3,6 +3,8 @@ import { formatWitaTimestamp, getWitaRange } from "../utils/dateHelper.js";
 import { classifyMoisture } from "../domain/moistureClassifier.js";
 import { parseStrictFiniteNumber } from "../utils/strictNumber.js";
 import { getLatestSoilPh } from "./soilPhService.js";
+import { getSensorPlacementReadSource } from "../config/sensorPlacementRead.js";
+import { readSensorPlacements, readPlacementSensorRegistry } from "./sensorPlacementReadService.js";
 
 // Mapping nama sensor ESP32 -> sensor_id di database
 // Bisa dikonfigurasi via env: SENSOR_ID_MAP={"sensor1":1,"sensor2":2,...}
@@ -74,6 +76,8 @@ export async function getRecentLogs(sensorId) {
 }
 
 export async function getSensors() {
+  const placementSource = getSensorPlacementReadSource();
+  if (placementSource === "db") return readSensorPlacements(await readPlacementSensorRegistry(), placementSource);
   const { data, error } = await supabase
     .from("sensors")
     .select("id, sensor_name, bedengan, location, status")
@@ -83,7 +87,7 @@ export async function getSensors() {
     throw error;
   }
 
-  return data;
+  return readSensorPlacements(data ?? [], placementSource);
 }
 
 export async function getSensorData(sensorId) {
@@ -182,7 +186,7 @@ export async function getSensorData(sensorId) {
 const getLatestReadings = async () => {
   const { data, error } = await supabase
     .from(config.logsTable)
-    .select("sensor_id, moisture, created_at")
+    .select(getSensorPlacementReadSource() === "db" ? "sensor_id::text, moisture, created_at" : "sensor_id, moisture, created_at")
     .order(config.timestampColumn, { ascending: false })
     .limit(10000);
 
@@ -190,8 +194,8 @@ const getLatestReadings = async () => {
 
   const latestBySensor = new Map();
   data.forEach((reading) => {
-    if (!latestBySensor.has(reading.sensor_id)) {
-      latestBySensor.set(reading.sensor_id, reading);
+    if (!latestBySensor.has(String(reading.sensor_id))) {
+      latestBySensor.set(String(reading.sensor_id), reading);
     }
   });
 
@@ -206,7 +210,7 @@ export async function getNurseryOverview() {
   ]);
   const now = Date.now();
   const sensorRows = sensors.map((sensor) => {
-    const latest = latestBySensor.get(sensor.id);
+    const latest = latestBySensor.get(String(sensor.id));
     const lastSeen = latest?.created_at || null;
     const isOnline = Boolean(lastSeen && (now - new Date(lastSeen).getTime()) / 60000 <= 3);
     const classification = classifyMoisture(latest?.moisture);

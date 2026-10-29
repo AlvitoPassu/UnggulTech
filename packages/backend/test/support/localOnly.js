@@ -9,6 +9,7 @@ Object.assign(process.env, {
   GEMINI_API_KEY: "", FRONTEND_ORIGIN: "http://localhost:5173", SENSOR_ID_MAP: "{}",
   SUPABASE_LOGS_TABLE: "sensor_logs", SUPABASE_LOGS_TIMESTAMP_COLUMN: "created_at",
   SUPABASE_LOGS_STATUS_COLUMN: "status", RECENT_LOGS_LIMIT: "10", PH_ACTIVE_THRESHOLD_SECONDS: "180",
+  SENSOR_PLACEMENT_READ_SOURCE: "json", SENSOR_PLACEMENT_WRITE_ENABLED: "false",
 });
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = (input, options) => {

@@ -1,298 +1,69 @@
-import { useEffect, useState } from "react";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  FiActivity,
-  FiAlertCircle,
-  FiBattery,
-  FiInfo,
-  FiMapPin,
-  FiRefreshCw,
-  FiThermometer,
-  FiDroplet,
-} from "react-icons/fi";
-import { WiHumidity } from "react-icons/wi";
-import {
-  getRecentLogs,
-  getSensorData,
-  getGlobalSoilPh,
-  getGlobalSoilPhHistory,
-  getSensors,
-  getSensorDisplayName,
-} from "../api/sensorApi";
+import { useState } from "react";
+import { FiMapPin } from "react-icons/fi";
 import HeaderAuthStatus from "../components/Auth/HeaderAuthStatus";
+import { useAuth } from "../context/AuthContext";
+import NurseryMap from "../components/Sensor/NurseryMap";
+import BedMap from "../components/Sensor/BedMap";
+import SensorReadings from "../components/Sensor/SensorReadings";
+import useSensorMonitoring from "../components/Sensor/useSensorMonitoring";
+import { isOutsideMap, sensorsForBed } from "../components/Sensor/sensorMapModel";
+import "../components/Sensor/sensorMap.css";
 
-const panelClass = "rounded-lg border border-slate-200 bg-white shadow-sm";
+const panelClass = "min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
 
-const formatLastSeen = (date) => {
-  if (!date) return "Belum ada data";
+export default function SensorPage() {
+  const { isAuthenticated, secondsRemaining, openLoginModal, executeProtectedAction, sessionId } = useAuth();
+  const [selection, setSelection] = useState({ bed: 1, sensorId: "" });
+  const { registry, readings, ph, location, selectedSensor, selectedSensorId, savePlacement, refreshRegistry } = useSensorMonitoring(selection);
+  const savePosition = (id, payload, isCurrent) => executeProtectedAction(async () => {
+    if (!isCurrent()) return null;
+    try { return await savePlacement(id, payload); }
+    catch (error) {
+      if (error.response?.status === 401) openLoginModal();
+      throw error;
+    }
+  });
+  const bedSensors = sensorsForBed(registry.sensors, location, selection.bed);
+  const unassigned = registry.sensors.filter((sensor) => isOutsideMap(sensor, location));
+  const chooseBed = (bed) => setSelection({ bed, sensorId: "" });
 
-  const diffMinutes = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 60000));
-  if (diffMinutes < 1) return "Baru saja";
-  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
+  return <div className="sensor-page min-h-screen min-w-0 bg-[#F5F6F8] text-slate-800">
+    <header className="sticky top-0 z-30 h-[73px] border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
+      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
+        <div className="flex min-w-0 items-center gap-3"><img src="/apple-touch-icon.png" alt="" className="h-10 w-10 rounded-lg bg-white/15 object-contain" />
+          <div className="min-w-0"><p className="truncate text-sm font-semibold sm:text-base">Smart Soil Monitoring System</p><p className="mt-0.5 text-xs text-white/80">Pemetaan &amp; monitoring sensor</p></div></div>
+        <HeaderAuthStatus />
+      </div>
+    </header>
+    <main className="mx-auto min-w-0 max-w-[1440px] px-4 py-6 pb-28 sm:px-8 sm:py-7 sm:pb-28">
+      <div className="mb-6"><p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Pemetaan Bedengan</p><h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1></div>
+      <section className={panelClass} aria-labelledby="nursery-map-title">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="nursery-map-title" className="text-lg font-bold text-slate-900">Peta bedengan</h2><p className="mt-1 text-sm text-slate-500">Pilih bedengan untuk melihat penempatan sensor.</p></div><span className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">60 bedengan · 6 × 10</span></div>
+        <p className="mt-4 flex items-center gap-2 text-sm text-slate-500"><FiMapPin className="shrink-0" aria-hidden="true" /><span className="break-words">{location || "Lokasi bibitan belum tercatat"}</span></p>
+        {registry.loading && <p role="status" className="mt-4 text-sm text-slate-500">Memuat daftar sensor…</p>}
+        {registry.error && <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">Daftar sensor gagal diperbarui. Pemetaan terakhir mungkin tidak mutakhir. Sistem mencoba kembali setiap 60 detik.</p>}
+        {!registry.loading && !registry.error && registry.sensors.length === 0 && <p role="status" className="mt-4 text-sm text-slate-500">Belum ada sensor terdaftar. Grid berikut adalah representasi layout.</p>}
+        <NurseryMap sensors={registry.sensors} location={location} selectedBed={selection.bed} onSelect={chooseBed} />
+        <p className="mt-3 text-xs leading-5 text-slate-500">Layout awal bibitan · Garis abu-abu menunjukkan jalur pipa dan sumisamsuwi. Titik biru kecil menandai bedengan dengan sensor terdaftar.</p>
+      </section>
 
-  return `${Math.floor(diffMinutes / 60)} jam lalu`;
-};
-
-const StatusBadge = ({ isOnline, sensorHealth }) => {
-  const health = sensorHealth || (isOnline ? "online" : "offline");
-  const config = health === "online"
-    ? { label: "Aktif", bg: "bg-[#e8f7fc] text-[#1DAADF]", dot: "bg-[#1DAADF]" }
-    : health === "stale"
-      ? { label: "Stale", bg: "bg-orange-50 text-orange-700", dot: "bg-orange-500" }
-      : { label: "Offline", bg: "bg-red-50 text-red-700", dot: "bg-red-500" };
-
-  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${config.bg}`}>
-    <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-    {config.label}
-  </span>;
-};
-
-const moistureConfig = {
-  dry:    { label: "Kering", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
-  normal: { label: "Normal", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
-  wet:    { label: "Basah", bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
-  Low:    { label: "Kering", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
-  Normal: { label: "Normal", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
-  High:   { label: "Basah", bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-500" },
-};
-
-const MoistureBadge = ({ condition, action, needsAttention = false }) => {
-  const cfg = moistureConfig[condition || action] ?? { label: action ?? "Tidak tersedia", bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400" };
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-        {cfg.label}
-      </span>
-      {needsAttention && <span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">Perlu Perhatian</span>}
-    </span>
-  );
-};
-
-const Metric = ({ icon: Icon, label, value, status, color = "text-[#1DAADF]" }) => (
-  <div className="rounded-md border border-slate-200 p-4">
-    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-      <Icon className={`text-lg ${color}`} aria-hidden="true" />
-      {label}
-    </div>
-    <p className="mt-3 text-xl font-bold tracking-tight text-slate-900">{value}</p>
-    <p className="mt-1 text-xs text-slate-500">{status}</p>
-  </div>
-);
-
-const SensorPage = () => {
-  const [sensors, setSensors] = useState([]);
-  const [selectedSensorId, setSelectedSensorId] = useState("");
-  const [sensorData, setSensorData] = useState(null);
-  const [recentLogs, setRecentLogs] = useState([]);
-  const [globalSoilPh, setGlobalSoilPh] = useState(null);
-  const [globalSoilPhHistory, setGlobalSoilPhHistory] = useState([]);
-
-  useEffect(() => {
-    const fetchSensors = () => {
-      getSensors().then((data) => {
-        setSensors(data);
-        setSelectedSensorId((previousId) => previousId || data[0]?.id || "");
-      });
-    };
-
-    fetchSensors();
-    const interval = setInterval(fetchSensors, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSensorId) return;
-
-    const fetchData = async () => {
-      const [nextSensorData, nextRecentLogs, nextSoilPh, nextSoilPhHistory] = await Promise.all([
-        getSensorData(selectedSensorId),
-        getRecentLogs(selectedSensorId),
-        getGlobalSoilPh(),
-        getGlobalSoilPhHistory(10),
-      ]);
-      setSensorData(nextSensorData);
-      setRecentLogs(nextRecentLogs);
-      setGlobalSoilPh(nextSoilPh);
-      setGlobalSoilPhHistory(nextSoilPhHistory);
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 30_000);
-    return () => clearInterval(interval);
-  }, [selectedSensorId]);
-
-  const selectedSensor = sensors.find((sensor) => sensor.id === selectedSensorId);
-  const isOnline = sensorData?.isOnline ?? false;
-  const moisture = sensorData?.moisture ?? "-";
-  const sensorLocation = selectedSensor?.location || "Lokasi belum tersedia";
-  const soilPhValue = globalSoilPh?.soilPh ?? null;
-  const soilPhStatus = globalSoilPh?.status === "active"
-    ? "Aktif"
-    : globalSoilPh?.status === "inactive"
-      ? "Tidak Aktif"
-      : "Belum Ada Data";
-  const soilPhDetail = soilPhValue === null
-    ? soilPhStatus
-    : `${soilPhStatus} · ${formatLastSeen(globalSoilPh?.measuredAt)}`;
-  const soilPhChart = globalSoilPhHistory.slice(-10).map((reading) => ({
-    soilPh: reading.soilPh,
-    time: new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(new Date(reading.measuredAt)),
-  }));
-  const moistureCondition = moistureConfig[sensorData?.condition || sensorData?.status]?.label || "Tidak tersedia";
-  const moistureStatus = sensorData?.needsAttention ? `${moistureCondition} · Perlu Perhatian` : moistureCondition;
-
-  return (
-    <div className="min-h-screen bg-[#F5F6F8] text-slate-800">
-      <header className="sticky top-0 z-30 h-[73px] border-b border-[#1686b3] bg-[#1DAADF] text-white shadow-sm">
-        <div className="mx-auto flex h-[73px] max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white">
-              <img src="/apple-touch-icon.png" alt="Smart Soil" className="h-full w-full rounded-lg object-contain" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">Smart Soil Monitoring System</p>
-              <p className="mt-0.5 truncate text-xs text-white/80">Monitoring detail sensor</p>
-            </div>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 text-right lg:flex">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Terakhir diperbarui</p>
-                <p className="text-xs font-semibold text-white">{formatLastSeen(sensorData?.lastSeen)}</p>
-              </div>
-              <FiRefreshCw className="text-white" aria-hidden="true" />
-            </div>
-            <div>
-              <label htmlFor="sensor-page-selector" className="sr-only">Pilih Bedengan</label>
-              <select
-                id="sensor-page-selector"
-                value={selectedSensorId}
-                onChange={(event) => setSelectedSensorId(event.target.value)}
-                className="w-28 rounded-md border border-white/40 bg-white px-2 py-2 text-sm font-medium text-slate-700 outline-none focus:border-white focus:ring-2 focus:ring-white/40 sm:w-auto sm:min-w-44 sm:px-3"
-              >
-                {sensors.length === 0 ? <option value="">Belum ada bedengan aktif</option> : sensors.map((sensor) => <option key={sensor.id} value={sensor.id}>{getSensorDisplayName(sensor)}</option>)}
-              </select>
-            </div>
-            <HeaderAuthStatus />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 sm:py-7">
-        <div className="mb-6">
-          <p className="mb-1 text-sm font-medium text-[#1DAADF]">Sensor / Detail Sensor</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Sensor</h1>
-        </div>
-
-        <section className={`${panelClass} p-5 sm:p-6`}>
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e8f7fc] text-[#1DAADF]">
-                <FiActivity className="text-2xl" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold text-slate-900">{selectedSensor ? getSensorDisplayName(selectedSensor) : "Sensor belum dipilih"}</h2>
-                <p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><FiMapPin aria-hidden="true" /> {sensorLocation}</p>
-              </div>
-            </div>
-            <StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} />
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[minmax(230px,0.8fr)_minmax(0,2fr)]">
-            <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
-              <div><dt className="text-xs text-slate-500">Lokasi</dt><dd className="mt-1 font-medium text-slate-800">{sensorLocation}</dd></div>
-              <div><dt className="text-xs text-slate-500">Jenis Tanaman</dt><dd className="mt-1 font-medium text-slate-800">Kelapa Sawit</dd></div>
-              <div><dt className="text-xs text-slate-500">Status Sensor</dt><dd className="mt-1"><StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} /></dd></div>
-              <div><dt className="text-xs text-slate-500">Terakhir Update</dt><dd className="mt-1 font-medium text-slate-800">{formatLastSeen(sensorData?.lastSeen)}</dd></div>
-            </dl>
-
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-              <Metric icon={FiDroplet} label="Soil Moisture" value={moisture === "-" ? "-" : `${moisture}%`} status={moistureStatus} />
-              <Metric icon={FiActivity} label="Soil pH Global" value={soilPhValue == null ? "-" : Number(soilPhValue).toFixed(2)} status={soilPhDetail} color="text-emerald-600" />
-              <Metric icon={FiThermometer} label="Temperature" value={sensorData?.temperature == null ? "-" : `${sensorData.temperature}°C`} status={sensorData?.temperature == null ? "Tidak tersedia" : "Data terbaru"} color="text-orange-500" />
-              <Metric icon={WiHumidity} label="Air Humidity" value={sensorData?.humidity == null ? "-" : `${sensorData.humidity}%`} status={sensorData?.humidityStatus || "Tidak tersedia"} color="text-sky-600" />
-              <Metric icon={FiBattery} label="Voltage" value="-" status="Tidak tersedia" color="text-violet-500" />
-            </div>
-          </div>
+      <div className="mt-6 grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
+        <section className={panelClass} aria-label="Detail bedengan terpilih">
+          {selection.bed ? <BedMap key={`${location}:${selection.bed}`} bed={selection.bed} sensors={bedSensors} selectedSensorId={selectedSensorId}
+            canEditPosition={isAuthenticated && secondsRemaining > 0}
+            onRequestPositionLogin={!isAuthenticated ? () => openLoginModal() : undefined}
+            editorSessionKey={sessionId} onSavePosition={savePosition} onRefreshPosition={refreshRegistry}
+            placementOperation={registry.operations?.[selectedSensorId]}
+            registryState={registry.loading ? "loading" : registry.error ? "error" : "ready"}
+            onSelect={(sensorId) => setSelection({ bed: selection.bed, sensorId })} />
+            : <p className="text-sm text-slate-500">Sensor ini berada di luar lokasi atau layout peta B1–B60. Pilih bedengan pada peta untuk melanjutkan.</p>}
+          {unassigned.length > 0 && <details className="mt-5 border-t border-slate-100 pt-4"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-600">Sensor di luar peta ({unassigned.length})</summary><p className="mt-1 text-xs text-slate-500">Lokasi atau nomor bedengan belum sesuai dengan peta ini. Informasi sensor tetap dapat diakses.</p><div className="mt-3 flex flex-wrap gap-2">{unassigned.map((sensor) => <button key={sensor.id} type="button" className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm" aria-pressed={String(sensor.id) === selectedSensorId} onClick={() => setSelection({ bed: null, sensorId: String(sensor.id) })}>{sensor.sensor_name || `Sensor ${sensor.id}`}</button>)}</div></details>}
         </section>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-3">
-          <section className={`${panelClass} p-5 sm:p-6 xl:col-span-3`}>
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div><h2 className="text-base font-bold text-slate-900">Grafik Soil Moisture</h2><p className="mt-1 text-xs text-slate-500">Data aktual dari pembacaan sensor</p></div>
-              <span className="rounded-md bg-[#e8f7fc] px-2.5 py-1 text-xs font-medium text-[#1DAADF]">10 data terbaru</span>
-            </div>
-            {sensorData?.chart?.length ? (
-              <div className="h-[290px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sensorData.chart} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={35} />
-                    <Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-                    <Line type="monotone" dataKey="moisture" name="Soil Moisture (%)" stroke="#1DAADF" strokeWidth={2.5} dot={{ r: 3, fill: "#1DAADF", strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <div className="flex h-[290px] items-center justify-center text-sm text-slate-400">Data grafik belum tersedia</div>}
-          </section>
-
-          <section className={`${panelClass} p-5 sm:p-6 xl:col-span-2`}>
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Grafik Soil pH Global</h2>
-                <p className="mt-1 text-xs text-slate-500">Satu series dari satu sensor pH untuk seluruh bedengan</p>
-              </div>
-              <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">10 data terbaru</span>
-            </div>
-            {soilPhChart.length ? (
-              <div className="h-[290px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={soilPhChart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis domain={[4, 8]} tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
-                    <Tooltip contentStyle={{ border: "1px solid #e2e8f0", borderRadius: "6px" }} />
-                    <Line type="monotone" dataKey="soilPh" name="Soil pH Global" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <div className="flex h-[290px] items-center justify-center text-sm text-slate-400">Data pH belum tersedia.</div>}
-          </section>
-
-          <section className={`${panelClass} p-5 sm:p-6`}>
-            <div className="flex items-center gap-2"><FiInfo className="text-lg text-[#1DAADF]" aria-hidden="true" /><h2 className="text-base font-bold text-slate-900">Informasi Sensor</h2></div>
-            <dl className="mt-5 divide-y divide-slate-100 text-sm">
-              <div className="flex flex-wrap justify-between gap-2 py-3"><dt className="text-slate-500">Tipe Sensor</dt><dd className="text-right font-medium text-slate-800">Capacitive Soil Moisture Sensor V2.0</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Interval Pengiriman</dt><dd className="font-medium text-slate-800">1 menit</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Tegangan Operasional</dt><dd className="font-medium text-slate-800">3.3V - 5.5V DC</dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Status Koneksi</dt><dd><StatusBadge isOnline={isOnline} sensorHealth={sensorData?.sensorHealth} /></dd></div>
-              <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Terakhir Update</dt><dd className="font-medium text-slate-800">{formatLastSeen(sensorData?.lastSeen)}</dd></div>
-            </dl>
-            <div className="mt-4 flex gap-2 rounded-md bg-[#e8f7fc] p-3 text-xs leading-5 text-[#1686b3]"><FiInfo className="mt-0.5 shrink-0" aria-hidden="true" /> Status ditentukan dari pembacaan sensor terakhir.</div>
-          </section>
-        </div>
-
-        <section className={`${panelClass} mt-6 overflow-hidden`}>
-          <div className="border-b border-slate-200 p-5"><h2 className="text-base font-bold text-slate-900">Data Terakhir</h2><p className="mt-1 text-xs text-slate-500">Riwayat pembacaan sensor terbaru</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Waktu</th><th className="px-5 py-3 font-semibold">Soil Moisture (%)</th><th className="px-5 py-3 font-semibold">Temperature (°C)</th><th className="px-5 py-3 font-semibold">Air Humidity (%)</th><th className="px-5 py-3 font-semibold">Kondisi Tanah</th></tr></thead><tbody>{recentLogs.length === 0 ? <tr><td colSpan="5" className="p-6 text-center text-slate-500">Belum ada data terbaru.</td></tr> : recentLogs.map((log) => <tr key={log.id}><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.time || "-"}</td><td className="border-t border-slate-100 px-5 py-3 font-medium text-slate-800">{log.moisture ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.temperature ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3 text-slate-600">{log.humidity ?? "-"}</td><td className="border-t border-slate-100 px-5 py-3"><MoistureBadge condition={log.condition} action={log.action} needsAttention={log.needsAttention} /></td></tr>)}</tbody></table></div>
+        <section className={panelClass} aria-label="Informasi sensor dan pengukuran global">
+          <SensorReadings sensor={selectedSensor} readings={readings} ph={ph} unavailable={registry.error} />
         </section>
-
-        <section className={`${panelClass} mt-6 p-5 sm:p-6`}><div className="flex items-start gap-3"><FiAlertCircle className="mt-0.5 text-lg text-slate-400" aria-hidden="true" /><div><h2 className="text-base font-bold text-slate-900">Catatan Status</h2><p className="mt-1 text-sm text-slate-500">{isOnline ? "Sensor sedang mengirimkan pembacaan terbaru." : "Sensor tidak mengirimkan pembacaan dalam periode terakhir."}</p></div></div></section>
-      </main>
-
-    </div>
-  );
-};
-
-export default SensorPage;
+      </div>
+    </main>
+  </div>;
+}

@@ -5,8 +5,30 @@ import { validateSensorId } from "../utils/validators.js";
 import { getNurseryMoistureTrend, getNurseryOverview, getRecentLogs, getSensorData, getSensors, insertSensorReadings } from "../services/sensorService.js";
 import { classifyMoisture } from "../domain/moistureClassifier.js";
 import { createSoilPhReading, getLatestSoilPh, getSoilPhHistory } from "../services/soilPhService.js";
+import { requireAuth, SessionError } from "../middleware/authMiddleware.js";
+import { isSensorPlacementWriteEnabled } from "../config/sensorPlacementWrite.js";
+import { saveSensorPlacement, SensorPlacementError } from "../services/sensorPlacementService.js";
 
 const router = Router();
+
+// Backend-only write path. Monitoring and IoT routes retain their existing access.
+router.put("/:sensorId/placement", (_req, res, next) => {
+  if (!isSensorPlacementWriteEnabled()) {
+    const error = new SensorPlacementError("SENSOR_PLACEMENT_WRITE_DISABLED");
+    return res.status(error.statusCode).json({ code: error.code, message: error.message });
+  }
+  return next();
+}, requireAuth, async (req, res, next) => {
+  try {
+    const saved = await saveSensorPlacement(req.params.sensorId, req.body, req.operatorIdentity);
+    return res.json({ code: "OK", message: saved.unchanged ? "Posisi sensor tidak berubah." : "Posisi sensor berhasil disimpan.", ...saved });
+  } catch (error) {
+    if (error instanceof SensorPlacementError || error instanceof SessionError) {
+      return res.status(error.statusCode || error.status).json({ code: error.code, message: error.message });
+    }
+    return next(error);
+  }
+});
 
 // GET /api/sensors
 router.get("/", async (_req, res, next) => {
@@ -137,5 +159,14 @@ router.get("/:sensorId/data", async (req, res, next) => {
     next(error);
   }
 });
+
+// Parse errors originate in app-level express.json(). Handle only this PUT path.
+export function handleSensorPlacementBodyError(error, req, res, next) {
+  if (req.method === "PUT" && req.path === "/" && ["entity.parse.failed", "entity.too.large"].includes(error?.type)) {
+    return res.status(error.type === "entity.too.large" ? 413 : 400)
+      .json({ code: "INVALID_PLACEMENT", message: "Body posisi sensor harus berupa JSON yang valid dan tidak melebihi 100kb." });
+  }
+  return next(error);
+}
 
 export default router;

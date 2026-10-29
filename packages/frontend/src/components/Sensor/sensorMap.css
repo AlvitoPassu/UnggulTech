@@ -1,0 +1,40 @@
+.sensor-page button:focus-visible, .sensor-page summary:focus-visible, .bed-viewport:focus-visible {
+  outline: 3px solid #1686b3;
+  outline-offset: 3px;
+}
+.sensor-page .map-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #475569;
+  font-size: 12px;
+}
+.sensor-page .map-control:disabled { opacity: .4; }
+.nursery-map { position: relative; padding-right: 22px; }
+.nursery-beds { position: relative; }
+.bed-button::after {
+  content: "";
+  position: absolute;
+  left: 15%; right: 15%; bottom: -6px;
+  border-bottom: 2px solid #cbd5e1;
+}
+.main-pipe {
+  position: absolute; top: 0; bottom: 18px; right: 5px;
+  border-right: 4px solid #94a3b8;
+  border-bottom: 4px solid #94a3b8;
+  width: 18px; border-bottom-right-radius: 8px;
+}
+.nursery-beds::before {
+  content: ""; position: absolute; inset: 0 -17px 0 0;
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(10% - 8px), #cbd5e1 calc(10% - 8px) calc(10% - 6px), transparent calc(10% - 6px) 10%);
+  pointer-events: none;
+}
+.bed-viewport { max-height: 580px; overscroll-behavior: contain; }
+.sensor-marker { scroll-margin: 60px; }
+@media (max-width: 639px) {
+  .sensor-page main { padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); }
+}

@@ -1,7 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { config } from "./config/supabase.js";
-import sensorRoutes from "./routes/sensorRoutes.js";
+import sensorRoutes, { handleSensorPlacementBodyError } from "./routes/sensorRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import weatherRoutes from "./routes/weatherRoutes.js";
 import historicalRoutes from "./routes/historicalRoutes.js";
@@ -19,6 +19,7 @@ const app = express();
 app.disable("x-powered-by");
 app.use(cors({ origin: config.allowedOrigins }));
 app.use(express.json({ limit: "100kb" }));
+app.use("/api/sensors/:sensorId/placement", handleSensorPlacementBodyError);
 
 // Health Check Endpoint
 app.get("/health", (_req, res) => res.json({ status: "ok" }));

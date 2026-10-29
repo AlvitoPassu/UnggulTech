@@ -1,4 +1,12 @@
 import axios from "axios";
+import { validatePlacementResult } from "../components/Sensor/sensorPlacementPersistence.js";
+
+export const saveSensorPlacement = async (sensorId, payload) => {
+  // Existing global Axios interceptors attach and validate operator credentials.
+  const response = await axios.put(`/api/sensors/${encodeURIComponent(sensorId)}/placement`, payload, { timeout: 10_000 });
+  if (response.status !== 200) throw Object.assign(new Error("Hasil penyimpanan belum pasti."), { code: "PLACEMENT_RESULT_UNCERTAIN" });
+  return validatePlacementResult(response.data, sensorId, payload);
+};
 
 export const getSensorDisplayName = (sensor = {}) => {
   const bedenganValue = sensor.bedengan ?? sensor.bedengan_id ?? sensor.bed_id;
@@ -28,8 +36,8 @@ export const sortSensorsByBedengan = (sensors = []) => {
 // -----------------------------
 // GET LIST SENSOR
 // -----------------------------
-export const getSensors = async () => {
-  const response = await axios.get("/api/sensors");
+export const getSensors = async (requestOptions) => {
+  const response = await axios.get("/api/sensors", requestOptions);
   return sortSensorsByBedengan(response.data);
 };
 
@@ -83,11 +91,12 @@ const getHumidityStatus = (humidity) => {
   return "Normal";
 };
 
-export const getRecentLogs = async (sensorId) => {
+export const getRecentLogs = async (sensorId, { throwOnError = false } = {}) => {
   try {
     const response = await axios.get(`/api/sensors/${sensorId}/recent-logs`);
     return response.data;
   } catch (error) {
+    if (throwOnError) throw error;
     console.error("Error mengambil recent logs:", error);
     return [];
   }
